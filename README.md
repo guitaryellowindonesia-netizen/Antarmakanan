@@ -23,6 +23,14 @@ Satu aplikasi untuk 4 peran: **Pelanggan, Mitra Resto, Driver, Admin**.
 - Ulasan & bintang untuk resto dan driver
 - Resto favorit, riwayat pesanan, top up saldo, ubah alamat
 
+### 📍 Lokasi & Lacak Pengantar (OpenStreetMap)
+- GPS **wajib aktif** selama memakai aplikasi (aplikasi terus meminta sampai diaktifkan)
+- Pelanggan memilih **titik antar** di peta; mitra mengatur **titik resto**
+- **Ongkir dihitung dari jarak GPS** (cadangan: perkiraan per kecamatan)
+- Pengantar (driver / penjual antar sendiri) mengirim posisi tiap ±15 detik saat mengantar
+- Pelanggan melihat peta 🛵 pengantar, 🏪 resto, 🏠 rumah + sisa jarak & perkiraan tiba
+- Tombol **🧭 Navigasi** membuka Google Maps langsung ke titik tujuan
+
 ### 🔔 Notifikasi (semua pengguna)
 - Pesanan baru, status pesanan, order baru untuk driver, chat, ulasan, top up, persetujuan akun
 - Pengumuman/promo dari admin ke semua pengguna atau peran tertentu

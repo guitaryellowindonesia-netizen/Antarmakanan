@@ -235,6 +235,8 @@ public class Repo {
                 o.put("address", u.address);
                 o.put("kecamatan", u.kecamatan);
                 o.put("vehicle", u.vehicle);
+                o.put("lat", u.lat);
+                o.put("lng", u.lng);
             }
         });
     }
@@ -379,11 +381,17 @@ public class Repo {
     // =====================================================================
 
     public List<Restaurant> restaurants(String userKec, boolean includeInactive) throws Exception {
+        return restaurants(userKec, 0, 0, includeInactive);
+    }
+
+    /** Daftar resto, jarak & ongkir dihitung dari titik GPS pengguna (jika ada). */
+    public List<Restaurant> restaurants(String userKec, double lat, double lng, boolean includeInactive)
+            throws Exception {
         List<Restaurant> out = new ArrayList<Restaurant>();
         for (JSONObject o : s.list(RESTOS)) {
             Restaurant r = Restaurant.fromJson(o);
             if (!r.active && !includeInactive) continue;
-            r.distanceKm = Geo.distanceKm(userKec, r.kecamatan);
+            r.distanceKm = Geo.distanceKm(userKec, lat, lng, r.kecamatan, r.lat, r.lng);
             r.deliveryFee = Geo.deliveryFee(r.distanceKm);
             out.add(r);
         }
@@ -399,10 +407,14 @@ public class Repo {
     }
 
     public Restaurant resto(String id, String userKec) throws Exception {
+        return resto(id, userKec, 0, 0);
+    }
+
+    public Restaurant resto(String id, String userKec, double lat, double lng) throws Exception {
         JSONObject o = s.get(RESTOS, id);
         if (o == null) throw new AppException("Resto tidak ditemukan");
         Restaurant r = Restaurant.fromJson(o);
-        r.distanceKm = Geo.distanceKm(userKec, r.kecamatan);
+        r.distanceKm = Geo.distanceKm(userKec, lat, lng, r.kecamatan, r.lat, r.lng);
         r.deliveryFee = Geo.deliveryFee(r.distanceKm);
         return r;
     }
@@ -609,10 +621,11 @@ public class Repo {
         public Promo promo;
     }
 
-    public Quote quote(Restaurant r, long subtotal, String kecamatan, String promoCode) throws Exception {
+    public Quote quote(Restaurant r, long subtotal, String kecamatan, double lat, double lng,
+                       String promoCode) throws Exception {
         Quote q = new Quote();
         q.subtotal = subtotal;
-        q.distanceKm = Geo.distanceKm(kecamatan, r.kecamatan);
+        q.distanceKm = Geo.distanceKm(kecamatan, lat, lng, r.kecamatan, r.lat, r.lng);
         q.deliveryFee = Geo.deliveryFee(q.distanceKm);
         q.serviceFee = Config.BIAYA_LAYANAN;
         if (promoCode != null && promoCode.trim().length() > 0) {
@@ -634,9 +647,11 @@ public class Repo {
     }
 
     public Order placeOrder(User u, String restoId, Cart cart, String address, String kecamatan,
-                            String note, String payment, String promoCode) throws Exception {
+                            double lat, double lng, String note, String payment, String promoCode)
+            throws Exception {
         if (cart.isEmpty()) throw new AppException("Keranjang kosong");
         if (address.trim().length() < 5) throw new AppException("Alamat pengiriman wajib diisi lengkap");
+        if (!Geo.has(lat, lng)) throw new AppException("Pilih titik lokasi pengantaran di peta");
         Restaurant r = resto(restoId, kecamatan);
         if (!r.isOpenNow()) throw new AppException("Maaf, resto sedang tutup");
 
@@ -658,7 +673,7 @@ public class Repo {
             subtotal += m.price * ci.qty;
         }
 
-        Quote q = quote(r, subtotal, kecamatan, promoCode);
+        Quote q = quote(r, subtotal, kecamatan, lat, lng, promoCode);
         if (promoCode != null && promoCode.trim().length() > 0 && q.promo == null) {
             throw new AppException(q.promoMessage);
         }
@@ -676,6 +691,10 @@ public class Repo {
         o.restoPhone = r.phone;
         o.restoOwnerId = r.ownerId;
         o.selfDelivery = r.selfDelivery;
+        o.custLat = lat;
+        o.custLng = lng;
+        o.restoLat = r.lat;
+        o.restoLng = r.lng;
         o.status = Order.MENUNGGU;
         o.subtotal = q.subtotal;
         o.deliveryFee = q.deliveryFee;
@@ -829,6 +848,7 @@ public class Repo {
             }
         });
         settle(o);
+        clearTracking(o.id);
         notify(o.customerId, "🎉 Pesanan sampai", "Selamat makan! Beri ulasan untuk " + o.restoName, o.id);
         return o;
     }
@@ -897,7 +917,15 @@ public class Repo {
     }
 
     /** Kembalikan saldo & kuota promo saat pesanan batal. */
+    private void clearTracking(String orderId) {
+        try {
+            s.delete(TRACKING, orderId);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void afterCancel(Order o) throws Exception {
+        clearTracking(o.id);
         if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
             adjustBalance(o.customerId, o.total, "Pengembalian dana " + o.code, true);
         }
@@ -969,6 +997,7 @@ public class Repo {
             }
         });
         settle(o);
+        clearTracking(o.id);
         notify(o.customerId, "🎉 Pesanan sampai", "Selamat makan! Beri ulasan untuk " + o.restoName, o.id);
         return o;
     }
@@ -1132,6 +1161,45 @@ public class Repo {
             for (String uid : to) notify(uid, title, m.text, orderId);
         } catch (Exception ignored) {
         }
+    }
+
+    // =====================================================================
+    //  LACAK PENGANTAR
+    // =====================================================================
+
+    public static final String TRACKING = "tracking";   // tracking/{orderId} = {lat,lng,at}
+
+    /** Pengantar mengirim posisinya. */
+    public void updateTracking(String orderId, double lat, double lng) throws Exception {
+        JSONObject o = new JSONObject();
+        o.put("id", orderId);
+        o.put("lat", lat);
+        o.put("lng", lng);
+        o.put("at", serverTime());
+        s.put(TRACKING, orderId, o);
+    }
+
+    /** Posisi terakhir pengantar: {lat, lng, at} atau null. */
+    public JSONObject tracking(String orderId) throws Exception {
+        return s.get(TRACKING, orderId);
+    }
+
+    /** Pesanan yang sedang diantar oleh pengguna ini (driver / penjual antar sendiri). */
+    public List<Order> deliveriesInProgress(User u) throws Exception {
+        List<Order> out = new ArrayList<Order>();
+        if (u.isDriver()) {
+            for (Order o : ordersOfDriver(u.id)) {
+                if (o.isActive() && o.status != Order.MENUNGGU) out.add(o);
+            }
+        } else if (u.isMerchant()) {
+            Restaurant r = restoOfOwner(u.id);
+            if (r != null) {
+                for (Order o : ordersOfResto(r.id)) {
+                    if (o.selfDelivery && o.status == Order.DIANTAR) out.add(o);
+                }
+            }
+        }
+        return out;
     }
 
     // =====================================================================

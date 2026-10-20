@@ -24,6 +24,7 @@ public class Restaurant {
     public double ratingSum;
     public int ratingCount;
     public long createdAt;
+    public double lat, lng;          // titik lokasi (GPS), 0 = belum diatur
 
     /** Dihitung di aplikasi (tidak disimpan) */
     public double distanceKm;
@@ -58,6 +59,8 @@ public class Restaurant {
         o.put("ratingSum", ratingSum);
         o.put("ratingCount", ratingCount);
         o.put("createdAt", createdAt);
+        o.put("lat", lat);
+        o.put("lng", lng);
         return o;
     }
 
@@ -81,6 +84,8 @@ public class Restaurant {
         r.ratingSum = o.optDouble("ratingSum", 0);
         r.ratingCount = o.optInt("ratingCount");
         r.createdAt = o.optLong("createdAt");
+        r.lat = o.optDouble("lat", 0);
+        r.lng = o.optDouble("lng", 0);
         return r;
     }
 }

@@ -248,6 +248,15 @@ public class MerchantMainActivity extends TabbedActivity {
                 page.addView(Views.header(MerchantMainActivity.this, r.emoji + " " + r.name,
                         "Kec. " + r.kecamatan + " • " + r.openHour + "-" + r.closeHour));
                 if (!r.active) page.addView(pendingBanner(r));
+                if (!com.antarmakan.app.util.Geo.has(r.lat, r.lng)) {
+                    LinearLayout w = Ui.card(MerchantMainActivity.this);
+                    w.setBackground(Ui.rounded(android.graphics.Color.parseColor("#FFF3E0"),
+                            Ui.dp(MerchantMainActivity.this, 12)));
+                    w.addView(Ui.text(MerchantMainActivity.this, "📍 Titik lokasi resto belum diatur", 14, Ui.ACCENT, true));
+                    w.addView(Ui.muted(MerchantMainActivity.this,
+                            "Atur di \"Ubah info toko\" agar ongkir akurat & driver mudah menemukan resto."));
+                    page.addView(w);
+                }
 
                 LinearLayout sw = Ui.card(MerchantMainActivity.this);
                 LinearLayout row = Ui.hbox(MerchantMainActivity.this);

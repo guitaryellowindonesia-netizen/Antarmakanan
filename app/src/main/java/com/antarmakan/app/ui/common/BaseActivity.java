@@ -77,6 +77,11 @@ public abstract class BaseActivity extends Activity {
         handler.removeCallbacks(poller);
         handler.post(poller);
         com.antarmakan.app.notif.NotifCenter.onActivityResumed(this);
+        if (requiresLocation()) {
+            registerReceiver(locationSwitch, new android.content.IntentFilter(
+                    android.location.LocationManager.PROVIDERS_CHANGED_ACTION));
+            checkLocation();
+        }
     }
 
     @Override
@@ -84,6 +89,129 @@ public abstract class BaseActivity extends Activity {
         super.onPause();
         handler.removeCallbacks(poller);
         com.antarmakan.app.notif.NotifCenter.onActivityPaused();
+        if (requiresLocation()) {
+            try {
+                unregisterReceiver(locationSwitch);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ GPS wajib aktif
+
+    private static final int REQ_PERMS = 501;
+    private android.app.AlertDialog locDialog;
+    private boolean permAsked;
+
+    /** Layar ini mewajibkan GPS aktif? (semua layar kecuali splash) */
+    protected boolean requiresLocation() {
+        return true;
+    }
+
+    private final android.content.BroadcastReceiver locationSwitch = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context c, android.content.Intent i) {
+            checkLocation();
+        }
+    };
+
+    private void checkLocation() {
+        if (!com.antarmakan.app.util.Loc.hasPermission(this)) {
+            if (!permAsked) {
+                permAsked = true;
+                requestAppPermissions();
+            } else {
+                showLocationDialog(false);
+            }
+            return;
+        }
+        if (!com.antarmakan.app.util.Loc.isEnabled(this)) {
+            showLocationDialog(true);
+            return;
+        }
+        if (locDialog != null) {
+            locDialog.dismiss();
+            locDialog = null;
+            onLocationReady();
+        }
+    }
+
+    /** Dipanggil saat GPS baru saja aktif kembali. */
+    protected void onLocationReady() {
+    }
+
+    private void requestAppPermissions() {
+        if (android.os.Build.VERSION.SDK_INT < 23) return;
+        java.util.List<String> p = new java.util.ArrayList<String>();
+        p.add(com.antarmakan.app.util.Loc.FINE);
+        p.add(com.antarmakan.app.util.Loc.COARSE);
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            p.add("android.permission.POST_NOTIFICATIONS");
+        }
+        requestPermissions(p.toArray(new String[0]), REQ_PERMS);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(req, perms, results);
+        if (req == REQ_PERMS && requiresLocation()) checkLocation();
+    }
+
+    private void showLocationDialog(final boolean gpsOff) {
+        if (locDialog != null && locDialog.isShowing()) return;
+        String msg = gpsOff
+                ? "GPS / Lokasi HP Anda mati.\n\nAplikasi ini wajib memakai lokasi agar ongkir akurat "
+                + "dan pengantar bisa menemukan alamat. Silakan aktifkan Lokasi."
+                : "Aplikasi membutuhkan izin LOKASI agar ongkir akurat dan pengantar bisa menemukan alamat.\n\n"
+                + "Silakan izinkan akses lokasi.";
+        locDialog = new android.app.AlertDialog.Builder(this)
+                .setTitle(gpsOff ? "📍 Aktifkan Lokasi" : "📍 Izin Lokasi Diperlukan")
+                .setMessage(msg)
+                .setCancelable(false)
+                .setPositiveButton(gpsOff ? "Aktifkan" : "Izinkan", null)
+                .setNegativeButton("Tutup Aplikasi", null)
+                .create();
+        locDialog.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(android.content.DialogInterface d) {
+                locDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(
+                        new android.view.View.OnClickListener() {
+                            @Override
+                            public void onClick(android.view.View v) {
+                                openLocationFix(gpsOff);
+                            }
+                        });
+                locDialog.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).setOnClickListener(
+                        new android.view.View.OnClickListener() {
+                            @Override
+                            public void onClick(android.view.View v) {
+                                finishAffinity();
+                            }
+                        });
+            }
+        });
+        locDialog.show();
+    }
+
+    private void openLocationFix(boolean gpsOff) {
+        try {
+            if (gpsOff) {
+                startActivity(new android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            } else if (android.os.Build.VERSION.SDK_INT >= 23
+                    && shouldShowRequestPermissionRationale(com.antarmakan.app.util.Loc.FINE)) {
+                requestAppPermissions();
+            } else {
+                // izin ditolak permanen: buka pengaturan aplikasi
+                android.content.Intent i = new android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                i.setData(android.net.Uri.parse("package:" + getPackageName()));
+                startActivity(i);
+            }
+        } catch (Exception e) {
+            Ui.toast(this, "Buka Setelan HP lalu aktifkan Lokasi");
+        }
     }
 
     @Override

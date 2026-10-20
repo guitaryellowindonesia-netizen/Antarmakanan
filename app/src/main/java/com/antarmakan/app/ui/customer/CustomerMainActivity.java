@@ -85,7 +85,8 @@ public class CustomerMainActivity extends TabbedActivity {
             public HomeData run() throws Exception {
                 HomeData d = new HomeData();
                 d.me = repo.me();
-                d.restos = repo.restaurants(d.me.kecamatan, false);
+                double[] p = here(d.me);
+                d.restos = repo.restaurants(d.me.kecamatan, p[0], p[1], false);
                 d.menus = repo.allMenus();
                 d.promos = repo.promos(true);
                 d.favs = repo.favoriteIds(d.me.id);
@@ -253,6 +254,13 @@ public class CustomerMainActivity extends TabbedActivity {
         });
     }
 
+    /** Posisi pelanggan: GPS terakhir, cadangannya titik rumah tersimpan. */
+    private double[] here(User u) {
+        android.location.Location l = com.antarmakan.app.util.Loc.lastKnown(this);
+        if (l != null) return new double[]{l.getLatitude(), l.getLongitude()};
+        return new double[]{u.lat, u.lng};
+    }
+
     private static String firstName(String n) {
         int i = n.indexOf(' ');
         return i > 0 ? n.substring(0, i) : n;
@@ -324,7 +332,8 @@ public class CustomerMainActivity extends TabbedActivity {
                 User u = repo.me();
                 Set<String> f = repo.favoriteIds(u.id);
                 List<Restaurant> out = new ArrayList<Restaurant>();
-                for (Restaurant r : repo.restaurants(u.kecamatan, false)) {
+                double[] p = here(u);
+                for (Restaurant r : repo.restaurants(u.kecamatan, p[0], p[1], false)) {
                     if (f.contains(r.id)) out.add(r);
                 }
                 return out;

@@ -52,6 +52,11 @@ public class SplashActivity extends BaseActivity {
         });
     }
 
+    @Override
+    protected boolean requiresLocation() {
+        return false;
+    }
+
     private void go() {
         if (Session.isLoggedIn(this)) {
             Nav.home(this, Session.role(this));

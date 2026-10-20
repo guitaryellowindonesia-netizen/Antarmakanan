@@ -68,7 +68,10 @@ public class RestaurantActivity extends BaseActivity {
             public Data run() throws Exception {
                 Data d = new Data();
                 d.me = repo.me();
-                d.r = repo.resto(restoId, d.me.kecamatan);
+                android.location.Location l = com.antarmakan.app.util.Loc.lastKnown(RestaurantActivity.this);
+                double lat = l != null ? l.getLatitude() : d.me.lat;
+                double lng = l != null ? l.getLongitude() : d.me.lng;
+                d.r = repo.resto(restoId, d.me.kecamatan, lat, lng);
                 d.menus = repo.menus(restoId);
                 d.fav = repo.favoriteIds(d.me.id).contains(restoId);
                 return d;

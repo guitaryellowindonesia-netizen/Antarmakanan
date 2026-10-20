@@ -131,6 +131,7 @@ public class DriverMainActivity extends TabbedActivity {
                 Views.stat(this, "Saldo", Fmt.rp(d.me.balance))));
 
         if (active != null) {
+            com.antarmakan.app.notif.TrackingService.start(this);
             page.addView(Ui.section(this, "🚩 Order yang sedang kamu kerjakan"));
             page.addView(Views.orderCard(this, active, User.ROLE_DRIVER));
         } else if (d.me.online) {

@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -48,6 +51,13 @@
         <activity android:name=".ui.common.WalletActivity" />
         <activity android:name=".ui.common.ProfileActivity" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.common.NotificationsActivity" />
+        <activity android:name=".ui.common.MapPickerActivity" />
+
+        <!-- Mengirim posisi pengantar selama mengantar pesanan -->
+        <service
+            android:name=".notif.TrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!-- Layanan agar notifikasi pesanan tetap masuk saat aplikasi ditutup -->
         <service

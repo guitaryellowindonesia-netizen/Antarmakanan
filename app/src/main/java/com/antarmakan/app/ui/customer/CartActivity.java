@@ -39,6 +39,8 @@ public class CartActivity extends BaseActivity {
 
     private LinearLayout itemsBox, summaryBox, promoChips;
     private Spinner kec;
+    private double pinLat, pinLng;     // titik antar (GPS)
+    private TextView pinInfo;
     private EditText address, note, promoCode;
     private RadioGroup payGroup;
     private TextView promoMsg;
@@ -100,6 +102,21 @@ public class CartActivity extends BaseActivity {
         // ---- alamat
         LinearLayout addr = Ui.card(this);
         addr.addView(Ui.title(this, "📍 Alamat Pengiriman"));
+        addr.addView(Ui.label(this, "Titik lokasi antar (wajib)"));
+        LinearLayout pinRow = Ui.hbox(this);
+        pinInfo = Ui.text(this, "Mencari lokasi Anda...", 14, Ui.TEXT, true);
+        pinRow.addView(pinInfo, Ui.weight(1));
+        TextView pick = Ui.smallButton(this, "🗺️ Atur di peta", Ui.PRIMARY, true);
+        pick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                com.antarmakan.app.ui.common.MapPickerActivity.open(CartActivity.this,
+                        "Titik Antar Pesanan", pinLat, pinLng);
+            }
+        });
+        pinRow.addView(pick);
+        addr.addView(pinRow);
+        addr.addView(Ui.muted(this, "Pastikan pin tepat di rumah Anda agar ongkir akurat & pengantar tidak tersesat."));
         addr.addView(Ui.label(this, "Kecamatan"));
         kec = Ui.spinner(this, Config.namaKecamatan(), Config.indexKecamatan(me.kecamatan));
         kec.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -188,6 +205,7 @@ public class CartActivity extends BaseActivity {
         sum.addView(order);
         page.addView(sum);
         recalc();
+        initPin();
     }
 
     private void renderItems() {
@@ -250,6 +268,56 @@ public class CartActivity extends BaseActivity {
         }
     }
 
+    /** Titik awal: lokasi rumah tersimpan, jika belum ada pakai GPS sekarang. */
+    private void initPin() {
+        if (Geo.has(me.lat, me.lng)) {
+            setPin(me.lat, me.lng, false);
+            return;
+        }
+        com.antarmakan.app.util.Loc.current(this, new com.antarmakan.app.util.Loc.Callback() {
+            @Override
+            public void onLocation(android.location.Location l) {
+                if (l != null) {
+                    setPin(l.getLatitude(), l.getLongitude(), false);
+                } else {
+                    pinInfo.setText("Belum dipilih");
+                    pinInfo.setTextColor(Ui.RED);
+                }
+            }
+        });
+    }
+
+    private void setPin(double lat, double lng, boolean saveAsHome) {
+        pinLat = lat;
+        pinLng = lng;
+        String k = Geo.nearestKecamatan(lat, lng);
+        pinInfo.setText("✅ Titik dipilih (Kec. " + k + ")");
+        pinInfo.setTextColor(Ui.PRIMARY_DARK);
+        int idx = Config.indexKecamatan(k);
+        if (kec.getSelectedItemPosition() != idx) kec.setSelection(idx); // memicu recalc
+        else recalc();
+        if (saveAsHome) {
+            me.lat = lat;
+            me.lng = lng;
+            me.kecamatan = k;
+            Async.run(new Async.Task<Boolean>() {
+                @Override
+                public Boolean run() throws Exception {
+                    repo.saveProfile(me);
+                    return true;
+                }
+            }, null);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == com.antarmakan.app.ui.common.MapPickerActivity.REQ && res == RESULT_OK && data != null) {
+            setPin(data.getDoubleExtra("lat", 0), data.getDoubleExtra("lng", 0), true);
+        }
+    }
+
     private String selectedKec() {
         return (String) kec.getSelectedItem();
     }
@@ -259,10 +327,11 @@ public class CartActivity extends BaseActivity {
         final long subtotal = Cart.get(this).subtotal();
         final String k = selectedKec();
         final String code = appliedPromo;
+        final double lat = pinLat, lng = pinLng;
         load(new Async.Task<Repo.Quote>() {
             @Override
             public Repo.Quote run() throws Exception {
-                return repo.quote(resto, subtotal, k, code);
+                return repo.quote(resto, subtotal, k, lat, lng, code);
             }
         }, new Async.Callback<Repo.Quote>() {
             @Override
@@ -291,6 +360,11 @@ public class CartActivity extends BaseActivity {
 
     private void placeOrder() {
         if (quote == null) return;
+        if (!Geo.has(pinLat, pinLng)) {
+            Ui.toast(this, "Atur dulu titik lokasi antar di peta");
+            return;
+        }
+        final double lat = pinLat, lng = pinLng;
         final String pay = payGroup.getCheckedRadioButtonId() == 2 ? Order.BAYAR_SALDO : Order.BAYAR_TUNAI;
         if (Order.BAYAR_SALDO.equals(pay) && me.balance < quote.total) {
             Ui.toast(this, "Saldo tidak cukup. Top up dulu di menu Akun");
@@ -309,7 +383,7 @@ public class CartActivity extends BaseActivity {
                             @Override
                             public Order run() throws Exception {
                                 return repo.placeOrder(me, resto.id, Cart.get(CartActivity.this),
-                                        addr, k, n, pay, code);
+                                        addr, k, lat, lng, n, pay, code);
                             }
                         }, new Async.Callback<Order>() {
                             @Override

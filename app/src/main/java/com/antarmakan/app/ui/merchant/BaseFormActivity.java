@@ -22,6 +22,9 @@ public abstract class BaseFormActivity extends BaseActivity {
     private boolean removePhoto;
     private ImageView preview;
 
+    protected double pinLat, pinLng;   // titik lokasi yang dipilih di peta
+    private TextView pinInfo;
+
     protected EditText field(LinearLayout parent, String label, String value, EditText input) {
         parent.addView(Ui.label(this, label));
         if (value != null) input.setText(value);
@@ -65,9 +68,49 @@ public abstract class BaseFormActivity extends BaseActivity {
         parent.addView(Ui.muted(this, "Foto otomatis diperkecil agar hemat kuota."));
     }
 
+    /** Bagian titik lokasi: info + tombol buka peta. */
+    protected void pinSection(LinearLayout parent, String label, double lat, double lng) {
+        pinLat = lat;
+        pinLng = lng;
+        parent.addView(Ui.label(this, label));
+        LinearLayout row = Ui.hbox(this);
+        pinInfo = Ui.text(this, "", 14, Ui.TEXT, true);
+        row.addView(pinInfo, Ui.weight(1));
+        TextView pick = Ui.smallButton(this, "🗺️ Atur di peta", Ui.PRIMARY, true);
+        pick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                com.antarmakan.app.ui.common.MapPickerActivity.open(BaseFormActivity.this,
+                        "Pilih Titik Lokasi", pinLat, pinLng);
+            }
+        });
+        row.addView(pick);
+        parent.addView(row);
+        showPin();
+    }
+
+    private void showPin() {
+        if (pinInfo == null) return;
+        boolean has = com.antarmakan.app.util.Geo.has(pinLat, pinLng);
+        pinInfo.setText(has ? "✅ Titik sudah diatur (Kec. "
+                + com.antarmakan.app.util.Geo.nearestKecamatan(pinLat, pinLng) + ")" : "⚠️ Belum diatur");
+        pinInfo.setTextColor(has ? Ui.PRIMARY_DARK : Ui.RED);
+    }
+
+    /** Dipanggil setelah titik dipilih di peta. */
+    protected void onPinPicked(double lat, double lng) {
+    }
+
     @Override
     protected void onActivityResult(int req, int result, Intent data) {
         super.onActivityResult(req, result, data);
+        if (req == com.antarmakan.app.ui.common.MapPickerActivity.REQ && result == RESULT_OK && data != null) {
+            pinLat = data.getDoubleExtra("lat", 0);
+            pinLng = data.getDoubleExtra("lng", 0);
+            showPin();
+            onPinPicked(pinLat, pinLng);
+            return;
+        }
         if (req != REQ_PHOTO || result != RESULT_OK || data == null || data.getData() == null) return;
         final android.net.Uri uri = data.getData();
         action("Memproses foto...", new Async.Task<String>() {

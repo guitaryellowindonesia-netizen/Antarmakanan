@@ -80,12 +80,7 @@ public abstract class TabbedActivity extends BaseActivity {
         root.addView(tabBar, Ui.matchWrap());
         setContentView(root);
 
-        // izin notifikasi (Android 13+)
-        if (android.os.Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 77);
-        }
+        // izin notifikasi diminta bersama izin lokasi (lihat BaseActivity)
         com.antarmakan.app.notif.NotifCenter.createChannels(this);
 
         int start = savedInstanceState == null

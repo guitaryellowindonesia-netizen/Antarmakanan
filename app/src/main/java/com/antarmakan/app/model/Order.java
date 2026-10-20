@@ -42,6 +42,8 @@ public class Order {
     public boolean rated;
     public boolean settled;
     public boolean selfDelivery;   // diantar sendiri oleh penjual
+    public double custLat, custLng;     // titik antar (GPS pelanggan)
+    public double restoLat, restoLng;   // titik resto
 
     // salinan data agar mudah ditampilkan
     public String restoName = "";
@@ -123,6 +125,10 @@ public class Order {
         o.put("rated", rated);
         o.put("settled", settled);
         o.put("selfDelivery", selfDelivery);
+        o.put("custLat", custLat);
+        o.put("custLng", custLng);
+        o.put("restoLat", restoLat);
+        o.put("restoLng", restoLng);
         o.put("restoName", restoName);
         o.put("restoEmoji", restoEmoji);
         o.put("restoAddress", restoAddress);
@@ -165,6 +171,10 @@ public class Order {
         r.rated = o.optBoolean("rated");
         r.settled = o.optBoolean("settled");
         r.selfDelivery = o.optBoolean("selfDelivery");
+        r.custLat = o.optDouble("custLat", 0);
+        r.custLng = o.optDouble("custLng", 0);
+        r.restoLat = o.optDouble("restoLat", 0);
+        r.restoLng = o.optDouble("restoLng", 0);
         r.restoName = o.optString("restoName");
         r.restoEmoji = o.optString("restoEmoji", "🍽️");
         r.restoAddress = o.optString("restoAddress");

@@ -82,6 +82,7 @@ public class RestoEditActivity extends BaseFormActivity {
         hours.addView(cl, Ui.weight(1));
         c.addView(hours);
 
+        pinSection(c, "Titik lokasi resto (untuk ongkir & navigasi driver)", r.lat, r.lng);
         final CheckBox self = new CheckBox(this);
         self.setText("🛵 Antar sendiri (ongkir 100% untuk penjual)");
         self.setChecked(r.selfDelivery);
@@ -109,6 +110,8 @@ public class RestoEditActivity extends BaseFormActivity {
                 String em = emoji.getText().toString().trim();
                 r.emoji = em.length() > 0 ? em : Config.emojiKategori(r.category);
                 r.kecamatan = (String) kec.getSelectedItem();
+                r.lat = pinLat;
+                r.lng = pinLng;
                 r.address = addr.getText().toString().trim();
                 r.phone = phone.getText().toString().trim();
                 r.openHour = normHour(open.getText().toString(), "08:00");

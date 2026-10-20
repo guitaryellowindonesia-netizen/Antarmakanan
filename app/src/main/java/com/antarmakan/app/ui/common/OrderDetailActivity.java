@@ -20,7 +20,17 @@ import com.antarmakan.app.model.User;
 import com.antarmakan.app.util.Async;
 import com.antarmakan.app.util.Fmt;
 import com.antarmakan.app.util.Geo;
+import com.antarmakan.app.util.MapUtil;
 import com.antarmakan.app.util.Ui;
+
+import org.json.JSONObject;
+import org.osmdroid.util.BoundingBox;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** Detail & pelacakan pesanan. Tombol aksi menyesuaikan peran pengguna. */
 public class OrderDetailActivity extends BaseActivity {
@@ -29,6 +39,13 @@ public class OrderDetailActivity extends BaseActivity {
     private LinearLayout page;
     private Order order;
     private User me;
+
+    // peta pelacakan
+    private MapView map;
+    private Marker courier;
+    private TextView trackInfo;
+    private JSONObject lastTrack;
+    private boolean mapFitted;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,19 +62,124 @@ public class OrderDetailActivity extends BaseActivity {
         load(new Async.Task<Object[]>() {
             @Override
             public Object[] run() throws Exception {
-                return new Object[]{repo.me(), repo.order(orderId)};
+                Order o = repo.order(orderId);
+                JSONObject t = o.isActive() ? repo.tracking(orderId) : null;
+                return new Object[]{repo.me(), o, t};
             }
         }, new Async.Callback<Object[]>() {
             @Override
             public void onResult(Object[] r) {
                 me = (User) r[0];
                 Order o = (Order) r[1];
+                lastTrack = (JSONObject) r[2];
                 // hanya gambar ulang jika ada perubahan
-                if (order != null && order.updatedAt == o.updatedAt && page.getChildCount() > 1) return;
-                order = o;
-                render();
+                if (order == null || order.updatedAt != o.updatedAt || page.getChildCount() <= 1) {
+                    order = o;
+                    render();
+                }
+                updateTracking();
             }
         });
+    }
+
+    /** Pengantar sedang menangani pesanan ini (posisinya dibagikan). */
+    private boolean courierActive() {
+        if (!order.isActive()) return false;
+        if (order.selfDelivery) return order.status == Order.DIANTAR;
+        return order.hasDriver();
+    }
+
+    private boolean iAmCourier() {
+        return (isDriver() && me.id.equals(order.driverId))
+                || (isMerchant() && order.selfDelivery);
+    }
+
+    /** Kartu peta: resto 🏪, tujuan 🏠, pengantar 🛵. */
+    private void addMapCard() {
+        map = null;
+        courier = null;
+        trackInfo = null;
+        mapFitted = false;
+        if (!order.isActive() || !Geo.has(order.custLat, order.custLng)) return;
+        LinearLayout card = Ui.card(this);
+        card.addView(Ui.label(this, courierActive() ? "LACAK PENGANTAR" : "LOKASI PENGANTARAN"));
+        map = MapUtil.create(this);
+        card.addView(map, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 260)));
+        MapUtil.marker(map, "🏠", "Tujuan: " + order.customerName, order.custLat, order.custLng);
+        if (Geo.has(order.restoLat, order.restoLng)) {
+            MapUtil.marker(map, "🏪", order.restoName, order.restoLat, order.restoLng);
+        }
+        map.getController().setZoom(15.0);
+        map.getController().setCenter(new GeoPoint(order.custLat, order.custLng));
+        trackInfo = Ui.text(this, courierActive() ? "Menunggu lokasi pengantar..." : "", 13, Ui.PRIMARY_DARK, true);
+        trackInfo.setPadding(0, Ui.dp(this, 6), 0, 0);
+        card.addView(trackInfo);
+        page.addView(card);
+    }
+
+    private void updateTracking() {
+        if (order == null || me == null) return;
+        if (iAmCourier() && courierActive()) {
+            com.antarmakan.app.notif.TrackingService.start(this);
+        }
+        if (map == null || !courierActive()) return;
+        if (lastTrack == null || !lastTrack.has("lat")) {
+            if (trackInfo != null) trackInfo.setText(iAmCourier()
+                    ? "📡 Mengirim lokasi Anda..." : "Menunggu lokasi pengantar...");
+            return;
+        }
+        double lat = lastTrack.optDouble("lat"), lng = lastTrack.optDouble("lng");
+        if (courier == null) {
+            courier = MapUtil.marker(map, "🛵", "Pengantar", lat, lng);
+        } else {
+            courier.setPosition(new GeoPoint(lat, lng));
+        }
+        if (!mapFitted) {
+            mapFitted = true;
+            fitMap(lat, lng);
+        }
+        map.invalidate();
+        double km = Geo.straightKm(lat, lng, order.custLat, order.custLng) * 1.3;
+        int min = Math.max(1, (int) Math.ceil(km / 25.0 * 60)); // ±25 km/jam
+        long ago = Math.max(0, (System.currentTimeMillis() - lastTrack.optLong("at")) / 1000);
+        String when = ago < 90 ? ago + " detik lalu" : (ago / 60) + " menit lalu";
+        if (trackInfo != null) {
+            trackInfo.setText(order.status == Order.DIANTAR
+                    ? "🛵 ± " + Fmt.km(km) + " lagi • tiba ± " + min + " menit (update " + when + ")"
+                    : "🛵 Pengantar menuju resto (update " + when + ")");
+        }
+    }
+
+    private void fitMap(double lat, double lng) {
+        List<GeoPoint> pts = new ArrayList<GeoPoint>();
+        pts.add(new GeoPoint(order.custLat, order.custLng));
+        pts.add(new GeoPoint(lat, lng));
+        if (Geo.has(order.restoLat, order.restoLng)) pts.add(new GeoPoint(order.restoLat, order.restoLng));
+        try {
+            final BoundingBox box = BoundingBox.fromGeoPoints(pts).increaseByScale(1.4f);
+            map.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        map.zoomToBoundingBox(box, false);
+                    } catch (Exception ignored) {
+                    }
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (map != null) map.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (map != null) map.onPause();
     }
 
     private boolean isCustomer() {
@@ -117,6 +239,9 @@ public class OrderDetailActivity extends BaseActivity {
         addActions(actions);
         if (actions.getChildCount() > 0) page.addView(actions);
 
+        // ---- peta
+        addMapCard();
+
         // ---- diantar sendiri oleh penjual
         if (order.selfDelivery) {
             LinearLayout d = Ui.card(this);
@@ -152,8 +277,12 @@ public class OrderDetailActivity extends BaseActivity {
             nav.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Ui.maps(OrderDetailActivity.this, order.restoName + ", " + order.restoAddress,
-                            order.restoKecamatan);
+                    if (Geo.has(order.restoLat, order.restoLng)) {
+                        MapUtil.navigate(OrderDetailActivity.this, order.restoLat, order.restoLng);
+                    } else {
+                        Ui.maps(OrderDetailActivity.this, order.restoName + ", " + order.restoAddress,
+                                order.restoKecamatan);
+                    }
                 }
             });
             b.addView(nav);
@@ -183,7 +312,11 @@ public class OrderDetailActivity extends BaseActivity {
                 nav.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Ui.maps(OrderDetailActivity.this, order.address, order.kecamatan);
+                        if (Geo.has(order.custLat, order.custLng)) {
+                            MapUtil.navigate(OrderDetailActivity.this, order.custLat, order.custLng);
+                        } else {
+                            Ui.maps(OrderDetailActivity.this, order.address, order.kecamatan);
+                        }
                     }
                 });
                 c.addView(nav);

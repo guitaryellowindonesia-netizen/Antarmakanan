@@ -13,7 +13,7 @@ import com.antarmakan.app.util.Async;
 import com.antarmakan.app.util.Ui;
 
 /** Ubah profil: nama, kecamatan, alamat, kendaraan (driver). */
-public class ProfileActivity extends BaseActivity {
+public class ProfileActivity extends com.antarmakan.app.ui.merchant.BaseFormActivity {
 
     private User me;
 
@@ -60,12 +60,17 @@ public class ProfileActivity extends BaseActivity {
             veh.setText(me.vehicle);
             card.addView(veh);
         }
+        if (me.isCustomer()) pinSection(card, "Titik lokasi rumah", me.lat, me.lng);
         Button save = Ui.primary(this, "Simpan");
         save.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 me.name = name.getText().toString().trim();
                 me.kecamatan = (String) kec.getSelectedItem();
+                if (me.isCustomer()) {
+                    me.lat = pinLat;
+                    me.lng = pinLng;
+                }
                 me.address = addr.getText().toString().trim();
                 if (me.isDriver()) me.vehicle = veh.getText().toString().trim();
                 action("Menyimpan...", new Async.Task<Boolean>() {

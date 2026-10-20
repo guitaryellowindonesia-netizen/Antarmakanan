@@ -22,6 +22,7 @@ public class User {
     public boolean active = true;    // driver/mitra harus disetujui admin
     public String passwordHash = ""; // hanya dipakai di mode offline
     public long createdAt;
+    public double lat, lng;          // titik lokasi (GPS), 0 = belum diatur
     public double ratingSum;         // rating driver
     public int ratingCount;
 
@@ -56,6 +57,8 @@ public class User {
         o.put("active", active);
         if (passwordHash.length() > 0) o.put("passwordHash", passwordHash);
         o.put("createdAt", createdAt);
+        o.put("lat", lat);
+        o.put("lng", lng);
         o.put("ratingSum", ratingSum);
         o.put("ratingCount", ratingCount);
         return o;
@@ -76,6 +79,8 @@ public class User {
         u.active = o.optBoolean("active", true);
         u.passwordHash = o.optString("passwordHash");
         u.createdAt = o.optLong("createdAt");
+        u.lat = o.optDouble("lat", 0);
+        u.lng = o.optDouble("lng", 0);
         u.ratingSum = o.optDouble("ratingSum", 0);
         u.ratingCount = o.optInt("ratingCount");
         return u;
