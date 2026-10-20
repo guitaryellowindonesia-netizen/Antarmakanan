@@ -1,7 +1,5 @@
 package com.antarmakan.app.ui.driver;
 
-import android.media.AudioManager;
-import android.media.ToneGenerator;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.Switch;
@@ -23,7 +21,6 @@ import java.util.List;
 public class DriverMainActivity extends TabbedActivity {
 
     private static final int TAB_JOBS = 0, TAB_HISTORY = 1, TAB_ACCOUNT = 2;
-    private int lastJobs = -1;
 
     @Override
     protected String[] tabLabels() {
@@ -106,6 +103,7 @@ public class DriverMainActivity extends TabbedActivity {
                 }, new Async.Callback<Boolean>() {
                     @Override
                     public void onResult(Boolean r) {
+                        if (on) com.antarmakan.app.notif.NotifCenter.ensureService(DriverMainActivity.this);
                         loadJobs();
                     }
                 });
@@ -141,25 +139,8 @@ public class DriverMainActivity extends TabbedActivity {
                 page.addView(Ui.empty(this, "Belum ada order. Tunggu sebentar ya... ⏳"));
             }
             for (Order o : d.jobs) page.addView(Views.orderCard(this, o, User.ROLE_DRIVER));
-            if (lastJobs >= 0 && d.jobs.size() > lastJobs) beep();
-            lastJobs = d.jobs.size();
         }
         show(TAB_JOBS, page);
-    }
-
-    private void beep() {
-        try {
-            final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
-            tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 600);
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    tg.release();
-                }
-            }, 1000);
-            Ui.toast(this, "🔔 Ada order baru!");
-        } catch (Exception ignored) {
-        }
     }
 
     private static long startOfToday() {

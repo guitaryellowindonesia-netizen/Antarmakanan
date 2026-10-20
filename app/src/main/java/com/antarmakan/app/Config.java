@@ -82,8 +82,8 @@ public final class Config {
 
     /** Biaya layanan per pesanan & komisi untuk aplikasi */
     public static final int BIAYA_LAYANAN = 2000;
-    public static final int KOMISI_PERSEN_RESTO = 10;
-    public static final int KOMISI_PERSEN_DRIVER = 10;
+    public static final int KOMISI_PERSEN_RESTO = 5;
+    public static final int KOMISI_PERSEN_DRIVER = 5;
 
     /** Petunjuk transfer untuk top up saldo (diverifikasi manual oleh admin) */
     public static final String INFO_TRANSFER =

@@ -20,6 +20,7 @@ public class Restaurant {
     public String closeHour = "21:00";
     public boolean isOpen = true;     // saklar buka/tutup dari mitra
     public boolean active = true;     // disetujui admin
+    public boolean selfDelivery;      // diantar sendiri oleh penjual
     public double ratingSum;
     public int ratingCount;
     public long createdAt;
@@ -53,6 +54,7 @@ public class Restaurant {
         o.put("closeHour", closeHour);
         o.put("isOpen", isOpen);
         o.put("active", active);
+        o.put("selfDelivery", selfDelivery);
         o.put("ratingSum", ratingSum);
         o.put("ratingCount", ratingCount);
         o.put("createdAt", createdAt);
@@ -75,6 +77,7 @@ public class Restaurant {
         r.closeHour = o.optString("closeHour", "21:00");
         r.isOpen = o.optBoolean("isOpen", true);
         r.active = o.optBoolean("active", true);
+        r.selfDelivery = o.optBoolean("selfDelivery");
         r.ratingSum = o.optDouble("ratingSum", 0);
         r.ratingCount = o.optInt("ratingCount");
         r.createdAt = o.optLong("createdAt");

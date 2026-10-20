@@ -116,7 +116,7 @@ public class AdminMainActivity extends TabbedActivity {
                 if (o.createdAt >= today) gmvToday += o.total;
                 revenue += o.serviceFee - o.discount
                         + o.subtotal * com.antarmakan.app.Config.KOMISI_PERSEN_RESTO / 100
-                        + o.deliveryFee * com.antarmakan.app.Config.KOMISI_PERSEN_DRIVER / 100;
+                        + (o.selfDelivery ? 0 : o.deliveryFee * com.antarmakan.app.Config.KOMISI_PERSEN_DRIVER / 100);
             }
         }
         int customers = 0, drivers = 0, driversOnline = 0, pendingDrivers = 0, merchants = 0;
@@ -510,8 +510,54 @@ public class AdminMainActivity extends TabbedActivity {
             page.addView(c);
         }
 
+        // pengumuman
+        page.addView(Ui.section(this, "📢 Pengumuman"));
+        LinearLayout ann = Ui.card(this);
+        ann.addView(Views.menuRow(this, "📢", "Kirim pengumuman / promo ke pengguna", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                broadcastDialog();
+            }
+        }));
+        page.addView(ann);
+
         Views.accountSection(this, me, page);
         show(TAB_MORE, page);
+    }
+
+    private void broadcastDialog() {
+        LinearLayout box = Ui.vbox(this);
+        box.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
+        box.addView(Ui.label(this, "Kirim ke"));
+        final String[] roles = {"all", User.ROLE_CUSTOMER, User.ROLE_MERCHANT, User.ROLE_DRIVER};
+        final Spinner to = Ui.spinner(this, new String[]{"Semua pengguna", "Pelanggan", "Mitra Resto", "Driver"}, 0);
+        box.addView(to);
+        box.addView(Ui.label(this, "Judul"));
+        final EditText title = Ui.edit(this, "Contoh: Promo Gratis Ongkir!");
+        box.addView(title);
+        box.addView(Ui.label(this, "Isi pesan"));
+        final EditText body = Ui.multiline(this, "Contoh: Pakai kode GRATISONGKIR hari ini");
+        box.addView(body);
+        new AlertDialog.Builder(this)
+                .setTitle("Kirim Pengumuman")
+                .setView(box)
+                .setPositiveButton("Kirim", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        final String t = title.getText().toString();
+                        final String b = body.getText().toString();
+                        final String role = roles[to.getSelectedItemPosition()];
+                        exec(new Async.Task<Boolean>() {
+                            @Override
+                            public Boolean run() throws Exception {
+                                repo.broadcast(t, b, role);
+                                return true;
+                            }
+                        }, "Pengumuman terkirim");
+                    }
+                })
+                .setNegativeButton("Batal", null)
+                .show();
     }
 
     private void promoDialog(final Promo p) {

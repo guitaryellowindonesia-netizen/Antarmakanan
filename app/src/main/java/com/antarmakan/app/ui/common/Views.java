@@ -38,8 +38,8 @@ public final class Views {
                 + Geo.etaMinutes(r.distanceKm) + " mnt", 13, Ui.TEXT, false));
         LinearLayout bottom = Ui.hbox(a);
         bottom.setPadding(0, Ui.dp(a, 4), 0, 0);
-        bottom.addView(Ui.text(a, "🛵 Ongkir " + Fmt.rp(r.deliveryFee), 12, Ui.PRIMARY_DARK, true),
-                Ui.weight(1));
+        bottom.addView(Ui.text(a, (r.selfDelivery ? "🛵 Diantar penjual • " : "🛵 Ongkir ")
+                + Fmt.rp(r.deliveryFee), 12, Ui.PRIMARY_DARK, true), Ui.weight(1));
         if (!r.active) {
             bottom.addView(Ui.badge(a, "MENUNGGU PERSETUJUAN", Ui.ACCENT));
         } else if (!r.isOpenNow()) {
@@ -237,12 +237,14 @@ public final class Views {
                         }, new com.antarmakan.app.util.Async.Callback<Boolean>() {
                             @Override
                             public void onResult(Boolean r) {
+                                com.antarmakan.app.notif.NotifCenter.stopService(a);
                                 a.repo.logout();
                                 Nav.login(a);
                             }
                         }, new com.antarmakan.app.util.Async.ErrorCallback() {
                             @Override
                             public void onError(Exception e) {
+                                com.antarmakan.app.notif.NotifCenter.stopService(a);
                                 a.repo.logout();
                                 Nav.login(a);
                             }

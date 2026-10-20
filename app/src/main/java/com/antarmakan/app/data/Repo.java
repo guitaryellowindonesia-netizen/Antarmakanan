@@ -3,6 +3,7 @@ package com.antarmakan.app.data;
 import android.content.Context;
 
 import com.antarmakan.app.Config;
+import com.antarmakan.app.model.AppNotif;
 import com.antarmakan.app.model.CartItem;
 import com.antarmakan.app.model.MenuItem;
 import com.antarmakan.app.model.Message;
@@ -15,6 +16,7 @@ import com.antarmakan.app.model.TopUp;
 import com.antarmakan.app.model.User;
 import com.antarmakan.app.model.WalletTx;
 import com.antarmakan.app.util.Cart;
+import com.antarmakan.app.util.Fmt;
 import com.antarmakan.app.util.Geo;
 import com.antarmakan.app.util.Session;
 
@@ -46,6 +48,8 @@ public class Repo {
     public static final String WALLET = "wallet";
     public static final String TOPUPS = "topups";
     public static final String IMAGES = "images";
+    public static final String NOTIFS = "notifications";       // notifications/{uid}/{id}
+    public static final String BROADCASTS = "broadcasts";      // pengumuman admin
 
     private final Context ctx;
     private final Store s;
@@ -236,13 +240,17 @@ public class Repo {
     }
 
     public void setUserActive(String uid, final boolean active) throws Exception {
-        editUser(uid, new UserEdit() {
+        JSONObject u = editUser(uid, new UserEdit() {
             @Override
             public void edit(JSONObject o) throws Exception {
                 o.put("active", active);
                 if (!active) o.put("online", false);
             }
         });
+        if (active) {
+            notify(uid, "✅ Akun disetujui", User.ROLE_DRIVER.equals(u.optString("role"))
+                    ? "Akun driver Anda aktif. Nyalakan ONLINE untuk menerima order." : "Akun Anda aktif kembali.", "");
+        }
     }
 
     public void setDriverOnline(String uid, final boolean online) throws Exception {
@@ -356,11 +364,14 @@ public class Repo {
             }
         });
         TopUp t = TopUp.fromJson(o);
-        if (TopUp.TYPE_TOPUP.equals(t.type)) {
+        boolean top = TopUp.TYPE_TOPUP.equals(t.type);
+        if (top) {
             if (approve) adjustBalance(t.userId, t.amount, "Top up saldo", true);
         } else if (!approve) {
             adjustBalance(t.userId, t.amount, "Penarikan ditolak, saldo dikembalikan", true);
         }
+        notify(t.userId, (top ? "Top up " : "Penarikan ") + (approve ? "disetujui ✅" : "ditolak ❌"),
+                Fmt.rp(t.amount), "");
     }
 
     // =====================================================================
@@ -434,11 +445,26 @@ public class Repo {
     }
 
     public void setRestoActive(String restoId, final boolean active) throws Exception {
-        s.transact(RESTOS, restoId, new Store.Updater() {
+        JSONObject r = s.transact(RESTOS, restoId, new Store.Updater() {
             @Override
             public JSONObject update(JSONObject cur) throws Exception {
                 if (cur == null) throw new AppException("Resto tidak ditemukan");
                 cur.put("active", active);
+                return cur;
+            }
+        });
+        if (active) {
+            notify(r.optString("ownerId"), "🎉 Resto disetujui",
+                    r.optString("name") + " sudah tampil di aplikasi. Selamat berjualan!", "");
+        }
+    }
+
+    public void setRestoSelfDelivery(String restoId, final boolean self) throws Exception {
+        s.transact(RESTOS, restoId, new Store.Updater() {
+            @Override
+            public JSONObject update(JSONObject cur) throws Exception {
+                if (cur == null) throw new AppException("Resto tidak ditemukan");
+                cur.put("selfDelivery", self);
                 return cur;
             }
         });
@@ -649,6 +675,7 @@ public class Repo {
         o.restoKecamatan = r.kecamatan;
         o.restoPhone = r.phone;
         o.restoOwnerId = r.ownerId;
+        o.selfDelivery = r.selfDelivery;
         o.status = Order.MENUNGGU;
         o.subtotal = q.subtotal;
         o.deliveryFee = q.deliveryFee;
@@ -690,6 +717,8 @@ public class Repo {
             throw e;
         }
         cart.clear();
+        notify(o.restoOwnerId, "🔔 Pesanan baru " + o.code,
+                o.customerName + " • " + o.itemCount() + " item • " + Fmt.rp(o.subtotal), o.id);
         return o;
     }
 
@@ -728,7 +757,7 @@ public class Repo {
     public List<Order> availableJobs() throws Exception {
         List<Order> out = new ArrayList<Order>();
         for (Order o : toOrders(s.query(ORDERS, "driverId", ""))) {
-            if (o.status == Order.DIMASAK || o.status == Order.SIAP) out.add(o);
+            if (!o.selfDelivery && (o.status == Order.DIMASAK || o.status == Order.SIAP)) out.add(o);
         }
         return out;
     }
@@ -758,23 +787,62 @@ public class Repo {
     // ---- aksi resto ----
 
     public Order restoAccept(String orderId) throws Exception {
-        return transition(orderId, new Transition() {
+        Order o = transition(orderId, new Transition() {
             @Override
             public void apply(Order o) {
                 if (o.status != Order.MENUNGGU) throw new AppException("Pesanan sudah diproses");
                 o.status = Order.DIMASAK;
             }
         });
+        notify(o.customerId, "👨‍🍳 Pesanan diterima", o.restoName + " sedang menyiapkan pesananmu", o.id);
+        if (!o.selfDelivery) notifyOnlineDrivers(o);
+        return o;
+    }
+
+    /** Resto mengantar sendiri: mulai antar. */
+    public Order restoStartDelivery(String orderId) throws Exception {
+        Order o = transition(orderId, new Transition() {
+            @Override
+            public void apply(Order o) {
+                if (!o.selfDelivery) throw new AppException("Pesanan ini diantar driver");
+                if (o.status != Order.DIMASAK && o.status != Order.SIAP) {
+                    throw new AppException("Status pesanan sudah berubah");
+                }
+                o.status = Order.DIANTAR;
+                o.driverName = o.restoName + " (penjual)";
+                o.driverPhone = o.restoPhone;
+            }
+        });
+        notify(o.customerId, "🛵 Pesanan sedang diantar", "Diantar langsung oleh " + o.restoName, o.id);
+        return o;
+    }
+
+    /** Resto mengantar sendiri: pesanan sampai. */
+    public Order restoDelivered(String orderId) throws Exception {
+        Order o = transition(orderId, new Transition() {
+            @Override
+            public void apply(Order o) {
+                if (!o.selfDelivery) throw new AppException("Pesanan ini diantar driver");
+                if (o.status != Order.DIANTAR) throw new AppException("Status pesanan sudah berubah");
+                o.status = Order.SELESAI;
+                o.settled = true;
+            }
+        });
+        settle(o);
+        notify(o.customerId, "🎉 Pesanan sampai", "Selamat makan! Beri ulasan untuk " + o.restoName, o.id);
+        return o;
     }
 
     public Order restoReady(String orderId) throws Exception {
-        return transition(orderId, new Transition() {
+        Order o = transition(orderId, new Transition() {
             @Override
             public void apply(Order o) {
                 if (o.status != Order.DIMASAK) throw new AppException("Status pesanan sudah berubah");
                 o.status = o.hasDriver() ? Order.DIJEMPUT : Order.SIAP;
             }
         });
+        if (o.hasDriver()) notify(o.driverId, "🥡 Makanan siap diambil", o.restoName + " • " + o.code, o.id);
+        return o;
     }
 
     public Order restoReject(String orderId, final String reason) throws Exception {
@@ -787,6 +855,7 @@ public class Repo {
             }
         });
         afterCancel(o);
+        notify(o.customerId, "❌ Pesanan ditolak resto", reason, o.id);
         return o;
     }
 
@@ -804,6 +873,7 @@ public class Repo {
             }
         });
         afterCancel(o);
+        notify(o.restoOwnerId, "Pesanan " + o.code + " dibatalkan", "Dibatalkan oleh pelanggan", o.id);
         return o;
     }
 
@@ -819,6 +889,10 @@ public class Repo {
             }
         });
         afterCancel(o);
+        String t = "Pesanan " + o.code + " dibatalkan admin";
+        notify(o.customerId, t, reason, o.id);
+        notify(o.restoOwnerId, t, reason, o.id);
+        notify(o.driverId, t, reason, o.id);
         return o;
     }
 
@@ -850,9 +924,10 @@ public class Repo {
         for (Order mine : ordersOfDriver(driver.id)) {
             if (mine.isActive()) throw new AppException("Selesaikan dulu pesanan " + mine.code);
         }
-        return transition(orderId, new Transition() {
+        Order taken = transition(orderId, new Transition() {
             @Override
             public void apply(Order o) {
+                if (o.selfDelivery) throw new AppException("Pesanan ini diantar sendiri oleh resto");
                 if (o.hasDriver()) throw new AppException("Pesanan sudah diambil driver lain");
                 if (o.status != Order.DIMASAK && o.status != Order.SIAP) {
                     throw new AppException("Pesanan tidak tersedia");
@@ -864,10 +939,13 @@ public class Repo {
                 if (o.status == Order.SIAP) o.status = Order.DIJEMPUT;
             }
         });
+        notify(taken.customerId, "🛵 Driver ditemukan", driver.name + " akan mengantar pesananmu", taken.id);
+        notify(taken.restoOwnerId, "🛵 Driver menuju resto", driver.name + " • " + taken.code, taken.id);
+        return taken;
     }
 
     public Order driverPickedUp(String orderId, final String driverId) throws Exception {
-        return transition(orderId, new Transition() {
+        Order o = transition(orderId, new Transition() {
             @Override
             public void apply(Order o) {
                 if (!driverId.equals(o.driverId)) throw new AppException("Bukan pesanan Anda");
@@ -876,6 +954,8 @@ public class Repo {
                 o.status = Order.DIANTAR;
             }
         });
+        notify(o.customerId, "🛵 Pesanan sedang diantar", o.driverName + " menuju lokasimu", o.id);
+        return o;
     }
 
     public Order driverDelivered(String orderId, final String driverId) throws Exception {
@@ -889,6 +969,7 @@ public class Repo {
             }
         });
         settle(o);
+        notify(o.customerId, "🎉 Pesanan sampai", "Selamat makan! Beri ulasan untuk " + o.restoName, o.id);
         return o;
     }
 
@@ -901,6 +982,18 @@ public class Repo {
     private void settle(Order o) throws Exception {
         long komisiResto = o.subtotal * Config.KOMISI_PERSEN_RESTO / 100;
         long komisiDriver = o.deliveryFee * Config.KOMISI_PERSEN_DRIVER / 100;
+        if (o.selfDelivery) {
+            // diantar sendiri: ongkir 100% untuk penjual
+            if (o.restoOwnerId.length() == 0) return;
+            if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
+                adjustBalance(o.restoOwnerId, o.subtotal - komisiResto + o.deliveryFee,
+                        "Penjualan + ongkir " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", true);
+            } else {
+                adjustBalance(o.restoOwnerId, o.discount - komisiResto - o.serviceFee,
+                        "Komisi & biaya layanan " + o.code + " (tunai)", true);
+            }
+            return;
+        }
         if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
             if (o.restoOwnerId.length() > 0) {
                 adjustBalance(o.restoOwnerId, o.subtotal - komisiResto,
@@ -942,6 +1035,8 @@ public class Repo {
         r.comment = comment == null ? "" : comment.trim();
         r.createdAt = now();
         s.put(REVIEWS, r.id, r.toJson());
+        notify(o.restoOwnerId, "⭐ Ulasan baru (" + rating + " bintang)",
+                o.customerName + (r.comment.length() > 0 ? ": " + r.comment : ""), o.id);
 
         s.transact(RESTOS, o.restoId, new Store.Updater() {
             @Override
@@ -1026,6 +1121,93 @@ public class Repo {
         m.text = text.trim();
         m.createdAt = now();
         s.put(MSGS, m.id, m.toJson());
+        try {
+            Order o = order(orderId);
+            String title = "💬 " + from.name + " (" + o.code + ")";
+            Set<String> to = new HashSet<String>();
+            to.add(o.customerId);
+            to.add(o.restoOwnerId);
+            if (o.hasDriver()) to.add(o.driverId);
+            to.remove(from.id);
+            for (String uid : to) notify(uid, title, m.text, orderId);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // =====================================================================
+    //  NOTIFIKASI
+    // =====================================================================
+
+    private static JSONObject serverTime() throws Exception {
+        return new JSONObject().put(".sv", "timestamp");
+    }
+
+    /** Kirim notifikasi ke satu pengguna. Tidak pernah menggagalkan aksi utama. */
+    private void notify(String uid, String title, String body, String orderId) {
+        if (uid == null || uid.length() == 0) return;
+        try {
+            JSONObject o = new JSONObject();
+            String id = Ids.newId();
+            o.put("id", id);
+            o.put("title", title);
+            o.put("body", body);
+            o.put("orderId", orderId == null ? "" : orderId);
+            o.put("createdAt", serverTime());
+            s.put(NOTIFS + "/" + uid, id, o);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void notifyOnlineDrivers(Order o) {
+        try {
+            for (JSONObject u : s.query(USERS, "role", User.ROLE_DRIVER)) {
+                if (u.optBoolean("online") && u.optBoolean("active", true)) {
+                    notify(u.optString("id"), "📦 Order baru tersedia",
+                            o.restoName + " → Kec. " + o.kecamatan + " • ongkir " + Fmt.rp(o.deliveryFee), o.id);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static List<AppNotif> toNotifs(List<JSONObject> raw) {
+        List<AppNotif> out = new ArrayList<AppNotif>();
+        for (JSONObject o : raw) out.add(AppNotif.fromJson(o));
+        Collections.sort(out, new Comparator<AppNotif>() {
+            @Override
+            public int compare(AppNotif a, AppNotif b) {
+                return Long.compare(a.createdAt, b.createdAt);
+            }
+        });
+        return out;
+    }
+
+    /** Notifikasi pribadi yang lebih baru dari "after" (urut lama ke baru). after < 0 = 50 terakhir. */
+    public List<AppNotif> notificationsSince(String uid, long after) throws Exception {
+        return toNotifs(s.since(NOTIFS + "/" + uid, "createdAt", after, 50));
+    }
+
+    /** Pengumuman admin untuk peran tertentu. */
+    public List<AppNotif> broadcastsSince(String role, long after) throws Exception {
+        List<AppNotif> out = new ArrayList<AppNotif>();
+        for (AppNotif n : toNotifs(s.since(BROADCASTS, "createdAt", after, 20))) {
+            if ("all".equals(n.role) || n.role.equals(role)) out.add(n);
+        }
+        return out;
+    }
+
+    /** Admin mengirim pengumuman ke semua pengguna atau peran tertentu. */
+    public void broadcast(String title, String body, String role) throws Exception {
+        if (title.trim().length() < 3) throw new AppException("Judul pengumuman wajib diisi");
+        JSONObject o = new JSONObject();
+        String id = Ids.newId();
+        o.put("id", id);
+        o.put("title", title.trim());
+        o.put("body", body.trim());
+        o.put("role", role);
+        o.put("orderId", "");
+        o.put("createdAt", serverTime());
+        s.put(BROADCASTS, id, o);
     }
 
     public List<Message> messages(String orderId) throws Exception {

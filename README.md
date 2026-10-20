@@ -23,7 +23,13 @@ Satu aplikasi untuk 4 peran: **Pelanggan, Mitra Resto, Driver, Admin**.
 - Ulasan & bintang untuk resto dan driver
 - Resto favorit, riwayat pesanan, top up saldo, ubah alamat
 
+### 🔔 Notifikasi (semua pengguna)
+- Pesanan baru, status pesanan, order baru untuk driver, chat, ulasan, top up, persetujuan akun
+- Pengumuman/promo dari admin ke semua pengguna atau peran tertentu
+- Tetap masuk saat aplikasi ditutup bila: toko buka (mitra), sedang online (driver), atau ada pesanan aktif (pelanggan)
+
 ### 🏪 Mitra Resto
+- Pilihan **Antar sendiri** (tanpa driver, ongkir 100% untuk penjual)
 - Notifikasi bunyi saat ada pesanan baru
 - Terima / tolak pesanan (dengan alasan), tandai "makanan siap"
 - Kelola menu: tambah, ubah, hapus, tandai habis, menu rekomendasi
@@ -47,8 +53,11 @@ Satu aplikasi untuk 4 peran: **Pelanggan, Mitra Resto, Driver, Admin**.
 ### 💰 Bagi hasil otomatis saat pesanan selesai
 | Bayar | Resto | Driver |
 |---|---|---|
-| Saldo | + harga makanan − komisi 10% | + ongkir − komisi 10% |
-| Tunai | driver bayar resto tunai; saldo resto − komisi 10% | driver terima uang tunai; saldo driver − komisi − biaya layanan (+ diskon promo diganti aplikasi) |
+| Saldo | + harga makanan − komisi 5% | + ongkir − komisi 5% |
+| Tunai | driver bayar resto tunai; saldo resto − komisi 5% | driver terima uang tunai; saldo driver − komisi − biaya layanan (+ diskon promo diganti aplikasi) |
+
+**Resto "Antar sendiri":** pesanan tidak masuk ke driver, penjual mengantar sendiri dan
+**ongkir 100% untuk penjual** (komisi 5% hanya dari harga makanan).
 
 Persen komisi, ongkir, biaya layanan bisa diubah di `Config.java`.
 

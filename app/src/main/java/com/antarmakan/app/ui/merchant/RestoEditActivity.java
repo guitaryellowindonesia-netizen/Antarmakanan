@@ -82,6 +82,11 @@ public class RestoEditActivity extends BaseFormActivity {
         hours.addView(cl, Ui.weight(1));
         c.addView(hours);
 
+        final CheckBox self = new CheckBox(this);
+        self.setText("🛵 Antar sendiri (ongkir 100% untuk penjual)");
+        self.setChecked(r.selfDelivery);
+        c.addView(self);
+
         final EditText owner = Ui.phone(this, "No HP akun mitra pemilik");
         final CheckBox active = new CheckBox(this);
         if (me.isAdmin()) {
@@ -108,6 +113,7 @@ public class RestoEditActivity extends BaseFormActivity {
                 r.phone = phone.getText().toString().trim();
                 r.openHour = normHour(open.getText().toString(), "08:00");
                 r.closeHour = normHour(close.getText().toString(), "21:00");
+                r.selfDelivery = self.isChecked();
                 final String ownerPh = owner.getText().toString().trim();
                 if (me.isAdmin()) {
                     r.active = active.isChecked();

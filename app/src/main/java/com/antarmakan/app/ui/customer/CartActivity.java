@@ -315,6 +315,7 @@ public class CartActivity extends BaseActivity {
                             @Override
                             public void onResult(Order o) {
                                 Ui.toast(CartActivity.this, "Pesanan terkirim ke resto! 🎉");
+                                com.antarmakan.app.notif.NotifCenter.ensureService(CartActivity.this);
                                 Views.openOrder(CartActivity.this, o.id);
                                 finish();
                             }

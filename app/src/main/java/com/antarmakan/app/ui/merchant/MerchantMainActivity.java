@@ -1,8 +1,6 @@
 package com.antarmakan.app.ui.merchant;
 
 import android.content.Intent;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
 import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
@@ -27,7 +25,6 @@ import java.util.List;
 public class MerchantMainActivity extends TabbedActivity {
 
     private static final int TAB_ORDERS = 0, TAB_MENU = 1, TAB_STORE = 2, TAB_ACCOUNT = 3;
-    private int lastPending = -1;
 
     @Override
     protected String[] tabLabels() {
@@ -137,26 +134,9 @@ public class MerchantMainActivity extends TabbedActivity {
                     page.addView(Ui.section(MerchantMainActivity.this, "Riwayat"));
                     page.addView(history);
                 }
-                if (lastPending >= 0 && pending > lastPending) beep();
-                lastPending = pending;
                 show(TAB_ORDERS, page);
             }
         });
-    }
-
-    private void beep() {
-        try {
-            final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
-            tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 600);
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    tg.release();
-                }
-            }, 1000);
-            Ui.toast(this, "🔔 Ada pesanan baru!");
-        } catch (Exception ignored) {
-        }
     }
 
     // ------------------------------------------------------------------ menu
@@ -291,6 +271,7 @@ public class MerchantMainActivity extends TabbedActivity {
                         }, new Async.Callback<Boolean>() {
                             @Override
                             public void onResult(Boolean x) {
+                                if (on) com.antarmakan.app.notif.NotifCenter.ensureService(MerchantMainActivity.this);
                                 loadStore();
                             }
                         });
@@ -298,6 +279,37 @@ public class MerchantMainActivity extends TabbedActivity {
                 });
                 row.addView(s);
                 sw.addView(row);
+
+                // antar sendiri
+                sw.addView(Ui.divider(MerchantMainActivity.this));
+                LinearLayout row2 = Ui.hbox(MerchantMainActivity.this);
+                LinearLayout info2 = Ui.vbox(MerchantMainActivity.this);
+                info2.addView(Ui.title(MerchantMainActivity.this, "🛵 Antar sendiri"));
+                info2.addView(Ui.muted(MerchantMainActivity.this, r.selfDelivery
+                        ? "Pesanan Anda antar sendiri, ongkir 100% untuk Anda"
+                        : "Nyalakan jika ingin mengantar sendiri (tanpa driver)"));
+                row2.addView(info2, Ui.weight(1));
+                Switch s2 = new Switch(MerchantMainActivity.this);
+                s2.setChecked(r.selfDelivery);
+                s2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, final boolean on) {
+                        action("Menyimpan...", new Async.Task<Boolean>() {
+                            @Override
+                            public Boolean run() throws Exception {
+                                repo.setRestoSelfDelivery(r.id, on);
+                                return true;
+                            }
+                        }, new Async.Callback<Boolean>() {
+                            @Override
+                            public void onResult(Boolean x) {
+                                loadStore();
+                            }
+                        });
+                    }
+                });
+                row2.addView(s2);
+                sw.addView(row2);
                 page.addView(sw);
 
                 // laporan

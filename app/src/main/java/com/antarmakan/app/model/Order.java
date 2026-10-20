@@ -41,6 +41,7 @@ public class Order {
     public long updatedAt;
     public boolean rated;
     public boolean settled;
+    public boolean selfDelivery;   // diantar sendiri oleh penjual
 
     // salinan data agar mudah ditampilkan
     public String restoName = "";
@@ -121,6 +122,7 @@ public class Order {
         o.put("updatedAt", updatedAt);
         o.put("rated", rated);
         o.put("settled", settled);
+        o.put("selfDelivery", selfDelivery);
         o.put("restoName", restoName);
         o.put("restoEmoji", restoEmoji);
         o.put("restoAddress", restoAddress);
@@ -162,6 +164,7 @@ public class Order {
         r.updatedAt = o.optLong("updatedAt");
         r.rated = o.optBoolean("rated");
         r.settled = o.optBoolean("settled");
+        r.selfDelivery = o.optBoolean("selfDelivery");
         r.restoName = o.optString("restoName");
         r.restoEmoji = o.optString("restoEmoji", "🍽️");
         r.restoAddress = o.optString("restoAddress");

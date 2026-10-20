@@ -17,6 +17,7 @@ import com.antarmakan.app.util.Ui;
 public abstract class TabbedActivity extends BaseActivity {
 
     private static final int MENU_REFRESH = 1;
+    private static final int MENU_NOTIF = 2;
 
     protected LinearLayout content;
     protected FrameLayout bottomExtra;
@@ -79,6 +80,14 @@ public abstract class TabbedActivity extends BaseActivity {
         root.addView(tabBar, Ui.matchWrap());
         setContentView(root);
 
+        // izin notifikasi (Android 13+)
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 77);
+        }
+        com.antarmakan.app.notif.NotifCenter.createChannels(this);
+
         int start = savedInstanceState == null
                 ? getIntent().getIntExtra("tab", 0) : savedInstanceState.getInt("tab", 0);
         highlight(start);
@@ -120,13 +129,25 @@ public abstract class TabbedActivity extends BaseActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        com.antarmakan.app.notif.NotifCenter.ensureService(this);
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        android.view.MenuItem n = menu.add(0, MENU_NOTIF, 0, "🔔");
+        n.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
         menu.add(0, MENU_REFRESH, 0, "Muat ulang");
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == MENU_NOTIF) {
+            startActivity(new android.content.Intent(this, NotificationsActivity.class));
+            return true;
+        }
         if (item.getItemId() == MENU_REFRESH) {
             refresh();
             return true;

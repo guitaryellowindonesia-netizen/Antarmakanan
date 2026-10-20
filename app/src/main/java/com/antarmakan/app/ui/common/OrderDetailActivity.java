@@ -100,8 +100,12 @@ public class OrderDetailActivity extends BaseActivity {
             st.addView(Ui.divider(this));
             step(st, "Pesanan dibuat", true);
             step(st, "Diterima & dimasak resto", order.status >= Order.DIMASAK);
-            step(st, order.hasDriver() ? "Driver " + order.driverName + " ditugaskan" : "Mencari driver",
-                    order.hasDriver());
+            if (order.selfDelivery) {
+                step(st, "Diantar langsung oleh penjual", order.status >= Order.DIANTAR);
+            } else {
+                step(st, order.hasDriver() ? "Driver " + order.driverName + " ditugaskan" : "Mencari driver",
+                        order.hasDriver());
+            }
             step(st, "Makanan diambil & diantar", order.status >= Order.DIANTAR);
             step(st, "Pesanan sampai", order.status == Order.SELESAI);
         }
@@ -112,6 +116,15 @@ public class OrderDetailActivity extends BaseActivity {
         actions.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
         addActions(actions);
         if (actions.getChildCount() > 0) page.addView(actions);
+
+        // ---- diantar sendiri oleh penjual
+        if (order.selfDelivery) {
+            LinearLayout d = Ui.card(this);
+            d.addView(Ui.label(this, "PENGANTARAN"));
+            d.addView(Ui.text(this, "🛵 Diantar langsung oleh penjual", 15, Ui.TEXT, true));
+            if (order.isActive() && isCustomer()) d.addView(contactRow(order.restoPhone, "resto"));
+            page.addView(d);
+        }
 
         // ---- driver
         if (order.hasDriver()) {
@@ -164,7 +177,8 @@ public class OrderDetailActivity extends BaseActivity {
         c.addView(Ui.muted(this, "Jarak ± " + Fmt.km(order.distanceKm)));
         if (order.note.length() > 0) c.addView(Ui.body(this, "📝 " + order.note));
         if (order.isActive() && !isCustomer()) {
-            if (isDriver() && order.status >= Order.DIJEMPUT) {
+            if ((isDriver() && order.status >= Order.DIJEMPUT)
+                    || (isMerchant() && order.selfDelivery && order.status == Order.DIANTAR)) {
                 TextView nav = Ui.smallButton(this, "🧭 Navigasi ke pelanggan", Ui.BLUE, false);
                 nav.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -341,7 +355,41 @@ public class OrderDetailActivity extends BaseActivity {
                     }
                 });
             }
-            if (s == Order.DIMASAK) {
+            if (order.selfDelivery && (s == Order.DIMASAK || s == Order.SIAP)) {
+                btn(a, "🛵 Mulai Antar", Ui.PRIMARY, true).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        doAction(new Async.Task<Order>() {
+                            @Override
+                            public Order run() throws Exception {
+                                return repo.restoStartDelivery(order.id);
+                            }
+                        }, "Hati-hati di jalan!");
+                    }
+                });
+            }
+            if (order.selfDelivery && s == Order.DIANTAR) {
+                String cash = Order.BAYAR_TUNAI.equals(order.paymentMethod)
+                        ? "\n\nTagih TUNAI ke pelanggan: " + Fmt.rp(order.total) : "\n\nSudah dibayar via saldo.";
+                final String msg = "Pastikan pesanan sudah diterima pelanggan." + cash;
+                btn(a, "🎉 Pesanan Sudah Sampai", Ui.PRIMARY, true).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Ui.confirm(OrderDetailActivity.this, "Selesaikan pesanan", msg, "Selesai", new Runnable() {
+                            @Override
+                            public void run() {
+                                doAction(new Async.Task<Order>() {
+                                    @Override
+                                    public Order run() throws Exception {
+                                        return repo.restoDelivered(order.id);
+                                    }
+                                }, "Pesanan selesai. Terima kasih!");
+                            }
+                        });
+                    }
+                });
+            }
+            if (!order.selfDelivery && s == Order.DIMASAK) {
                 btn(a, "🥡 Makanan Siap Diambil", Ui.PRIMARY, true).setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {

@@ -9,6 +9,8 @@
     "reviews":     { ".indexOn": ["restoId", "driverId"] },
     "messages":    { ".indexOn": ["orderId"] },
     "wallet":      { ".indexOn": ["userId"] },
-    "topups":      { ".indexOn": ["userId", "status"] }
+    "topups":      { ".indexOn": ["userId", "status"] },
+    "notifications": { "$uid": { ".indexOn": ["createdAt"] } },
+    "broadcasts":  { ".indexOn": ["createdAt"] }
   }
 }

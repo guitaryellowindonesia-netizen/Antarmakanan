@@ -18,6 +18,9 @@ public interface Store {
     /** Ambil dokumen yang field-nya sama dengan value (String/Number/Boolean). */
     List<JSONObject> query(String col, String field, Object value) throws Exception;
 
+    /** Dokumen dengan field (angka) > after, maksimal limit terbaru. after < 0 = semua. */
+    List<JSONObject> since(String col, String field, long after, int limit) throws Exception;
+
     void put(String col, String id, JSONObject obj) throws Exception;
 
     void delete(String col, String id) throws Exception;

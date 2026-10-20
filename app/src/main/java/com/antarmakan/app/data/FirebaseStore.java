@@ -74,6 +74,16 @@ public class FirebaseStore implements Store {
     }
 
     @Override
+    public List<JSONObject> since(String col, String field, long after, int limit) throws Exception {
+        String extra = "orderBy=" + URLEncoder.encode("\"" + field + "\"", "UTF-8")
+                + (after >= 0 ? "&startAt=" + (after + 1) : "")
+                + "&limitToLast=" + limit;
+        Http.Response r = Http.request("GET", url(col, null, extra), null, null);
+        check(r);
+        return children(r.body);
+    }
+
+    @Override
     public void put(String col, String id, JSONObject obj) throws Exception {
         Http.Response r = Http.request("PUT", url(col, id, "print=silent"), obj.toString(), null);
         check(r);

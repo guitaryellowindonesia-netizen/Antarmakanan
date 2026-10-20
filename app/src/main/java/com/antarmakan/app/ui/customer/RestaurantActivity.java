@@ -142,6 +142,7 @@ public class RestaurantActivity extends BaseActivity {
         info.addView(stats);
         info.addView(Ui.text(this, "🛵 Ongkir ke Kec. " + me.kecamatan + ": " + Fmt.rp(resto.deliveryFee),
                 13, Ui.PRIMARY_DARK, true));
+        if (resto.selfDelivery) info.addView(Ui.muted(this, "Pesanan diantar langsung oleh penjual"));
         if (!resto.isOpenNow()) {
             TextView closed = Ui.text(this, "Resto sedang TUTUP. Kamu belum bisa memesan.", 13, Ui.RED, true);
             closed.setPadding(0, Ui.dp(this, 6), 0, 0);

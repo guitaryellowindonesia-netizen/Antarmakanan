@@ -76,12 +76,14 @@ public abstract class BaseActivity extends Activity {
         super.onResume();
         handler.removeCallbacks(poller);
         handler.post(poller);
+        com.antarmakan.app.notif.NotifCenter.onActivityResumed(this);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         handler.removeCallbacks(poller);
+        com.antarmakan.app.notif.NotifCenter.onActivityPaused();
     }
 
     @Override
