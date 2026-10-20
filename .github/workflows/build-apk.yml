@@ -22,7 +22,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '7.6.4'
+          gradle-version: '8.5'
 
       - name: Build APK (debug, siap install)
         run: gradle assembleDebug --no-daemon --stacktrace

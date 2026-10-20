@@ -25,13 +25,22 @@ public class RegisterActivity extends BaseActivity {
     private EditText name, phone, pass, address, vehicle, restoName, restoAddress;
     private Spinner kec, restoCat;
     private LinearLayout driverBox, merchantBox;
+    private String googleUid, googleEmail;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        enableBack("Daftar Akun");
+        googleUid = getIntent().getStringExtra("googleUid");
+        googleEmail = getIntent().getStringExtra("googleEmail");
+        boolean google = googleUid != null;
+        enableBack(google ? "Lengkapi Profil" : "Daftar Akun");
         LinearLayout page = scrollPage();
         LinearLayout card = formCard(page);
+        if (google) {
+            card.addView(Ui.text(this, "Masuk sebagai " + googleEmail, 14, Ui.PRIMARY_DARK, true));
+            card.addView(Ui.muted(this, "Lengkapi data berikut untuk pertama kali."));
+            card.addView(Ui.divider(this));
+        }
 
         card.addView(Ui.label(this, "Daftar sebagai"));
         roleGroup = new RadioGroup(this);
@@ -44,13 +53,16 @@ public class RegisterActivity extends BaseActivity {
 
         card.addView(Ui.label(this, "Nama lengkap"));
         name = Ui.edit(this, "Nama Anda");
+        if (google) name.setText(getIntent().getStringExtra("googleName"));
         card.addView(name);
         card.addView(Ui.label(this, "Nomor HP (WhatsApp aktif)"));
         phone = Ui.phone(this, "08xxxxxxxxxx");
         card.addView(phone);
-        card.addView(Ui.label(this, "Kata sandi"));
         pass = Ui.password(this, "Minimal 6 karakter");
-        card.addView(pass);
+        if (!google) {
+            card.addView(Ui.label(this, "Kata sandi"));
+            card.addView(pass);
+        }
         card.addView(Ui.label(this, "Kecamatan"));
         kec = Ui.spinner(this, Config.namaKecamatan(), 0);
         card.addView(kec);
@@ -87,7 +99,7 @@ public class RegisterActivity extends BaseActivity {
         });
         updateRoleBoxes();
 
-        Button btn = Ui.primary(this, "Daftar");
+        Button btn = Ui.primary(this, google ? "Simpan & Mulai" : "Daftar");
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -151,6 +163,9 @@ public class RegisterActivity extends BaseActivity {
         action("Mendaftar...", new Async.Task<User>() {
             @Override
             public User run() throws Exception {
+                if (googleUid != null) {
+                    return repo.completeGoogleProfile(googleUid, googleEmail, n, ph, role, k, addr, veh, fd);
+                }
                 return repo.register(n, ph, pw, role, k, addr, veh, fd);
             }
         }, new Async.Callback<User>() {

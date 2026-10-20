@@ -37,6 +37,18 @@ public final class Config {
      */
     public static final String[] ADMIN_PHONES = {"081200000000"};
 
+    /**
+     * Login dengan Google (opsional, hanya mode online).
+     * Isi dengan "Web client ID" dari Firebase Console:
+     * Authentication > Sign-in method > Google > Web SDK configuration.
+     * Contoh: "1234567890-abcdef.apps.googleusercontent.com"
+     */
+    public static final String GOOGLE_WEB_CLIENT_ID = "";
+
+    public static boolean googleLoginEnabled() {
+        return isOnline() && GOOGLE_WEB_CLIENT_ID.length() > 0;
+    }
+
     public static boolean isOnline() {
         return FIREBASE_DB_URL.length() > 0 && FIREBASE_API_KEY.length() > 0;
     }

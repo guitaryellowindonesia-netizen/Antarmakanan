@@ -11,6 +11,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.antarmakan.app.Config;
+import com.antarmakan.app.data.Repo;
 import com.antarmakan.app.model.User;
 import com.antarmakan.app.ui.common.BaseActivity;
 import com.antarmakan.app.ui.common.Nav;
@@ -65,6 +66,20 @@ public class LoginActivity extends BaseActivity {
         });
         card.addView(reg);
 
+        if (Config.googleLoginEnabled()) {
+            TextView or = Ui.muted(this, "atau");
+            or.setGravity(Gravity.CENTER);
+            card.addView(or, Ui.matchWrap());
+            Button google = Ui.outlineButton(this, "G   Masuk dengan Google", Ui.BLUE);
+            google.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    googleLogin();
+                }
+            });
+            card.addView(google);
+        }
+
         if (!Config.isOnline()) {
             LinearLayout demo = formCard(page);
             demo.addView(Ui.title(this, "Akun demo (mode offline)"));
@@ -90,6 +105,40 @@ public class LoginActivity extends BaseActivity {
             }
         });
         parent.addView(row, Ui.matchWrap());
+    }
+
+    private void googleLogin() {
+        GoogleAuth.signIn(this, new GoogleAuth.Listener() {
+            @Override
+            public void onToken(final String idToken) {
+                action("Masuk dengan Google...", new Async.Task<Repo.GoogleLogin>() {
+                    @Override
+                    public Repo.GoogleLogin run() throws Exception {
+                        return repo.loginWithGoogle(idToken);
+                    }
+                }, new Async.Callback<Repo.GoogleLogin>() {
+                    @Override
+                    public void onResult(Repo.GoogleLogin g) {
+                        if (g.user != null) {
+                            Ui.toast(LoginActivity.this, "Selamat datang, " + g.user.name);
+                            Nav.home(LoginActivity.this, g.user.role);
+                        } else {
+                            // akun Google baru: lengkapi profil
+                            Intent i = new Intent(LoginActivity.this, RegisterActivity.class);
+                            i.putExtra("googleUid", g.uid);
+                            i.putExtra("googleName", g.name);
+                            i.putExtra("googleEmail", g.email);
+                            startActivity(i);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                Ui.toast(LoginActivity.this, message);
+            }
+        });
     }
 
     private void doLogin() {

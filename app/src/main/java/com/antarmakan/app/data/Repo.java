@@ -84,31 +84,78 @@ public class Repo {
     public User register(String name, String phone, String password, String role,
                          String kecamatan, String address, String vehicle,
                          Restaurant restoDraft) throws Exception {
-        phone = normalizePhone(phone);
-        if (name.trim().length() < 2) throw new AppException("Nama wajib diisi");
-        if (phone.length() < 9) throw new AppException("Nomor HP tidak valid");
         if (password.length() < 6) throw new AppException("Kata sandi minimal 6 karakter");
-
-        User u = new User();
-        u.name = name.trim();
-        u.phone = phone;
-        u.role = isAdminPhone(phone) ? User.ROLE_ADMIN : role;
-        u.kecamatan = kecamatan;
-        u.address = address;
-        u.vehicle = vehicle == null ? "" : vehicle;
-        u.createdAt = now();
-        // driver harus disetujui admin dulu
-        u.active = !User.ROLE_DRIVER.equals(u.role);
-
+        validateProfile(name, phone);
+        phone = normalizePhone(phone);
+        String uid;
+        String hash = "";
         if (isOnline()) {
-            u.id = auth.signUp(phone, password);
+            uid = auth.signUp(phone, password);
         } else {
             if (!s.query(USERS, "phone", phone).isEmpty()) {
                 throw new AppException("Nomor HP sudah terdaftar");
             }
-            u.id = Ids.newId();
-            u.passwordHash = Ids.sha256(phone + ":" + password);
+            uid = Ids.newId();
+            hash = Ids.sha256(phone + ":" + password);
         }
+        return createProfile(uid, name, phone, role, kecamatan, address, vehicle, restoDraft, hash, "");
+    }
+
+    private static void validateProfile(String name, String phone) {
+        if (name == null || name.trim().length() < 2) throw new AppException("Nama wajib diisi");
+        if (normalizePhone(phone).length() < 9) throw new AppException("Nomor HP tidak valid");
+    }
+
+    /** Langkah 1 login Google: masuk ke Firebase. Mengembalikan profil jika sudah pernah daftar. */
+    public GoogleLogin loginWithGoogle(String googleIdToken) throws Exception {
+        if (!isOnline()) throw new AppException("Login Google hanya tersedia saat online");
+        FirebaseAuthRest.GoogleResult g = auth.signInWithGoogle(googleIdToken);
+        GoogleLogin out = new GoogleLogin();
+        out.uid = g.uid;
+        out.name = g.name;
+        out.email = g.email;
+        JSONObject o = s.get(USERS, g.uid);
+        if (o != null) {
+            User u = User.fromJson(o);
+            if (!u.active && !u.isDriver()) throw new AppException("Akun Anda dinonaktifkan admin");
+            Session.login(ctx, u.id, u.role);
+            out.user = u;
+        }
+        return out;
+    }
+
+    public static class GoogleLogin {
+        public String uid, name, email;
+        public User user; // null = belum melengkapi profil
+    }
+
+    /** Langkah 2 login Google: lengkapi profil (no HP, alamat, peran). */
+    public User completeGoogleProfile(String uid, String email, String name, String phone, String role,
+                                      String kecamatan, String address, String vehicle,
+                                      Restaurant restoDraft) throws Exception {
+        validateProfile(name, phone);
+        User other = userByPhone(phone);
+        if (other != null && !other.id.equals(uid)) throw new AppException("Nomor HP sudah dipakai akun lain");
+        return createProfile(uid, name, normalizePhone(phone), role, kecamatan, address, vehicle,
+                restoDraft, "", email);
+    }
+
+    private User createProfile(String uid, String name, String phone, String role, String kecamatan,
+                               String address, String vehicle, Restaurant restoDraft,
+                               String passwordHash, String email) throws Exception {
+        User u = new User();
+        u.id = uid;
+        u.name = name.trim();
+        u.phone = phone;
+        u.email = email == null ? "" : email;
+        u.role = isAdminPhone(phone) ? User.ROLE_ADMIN : role;
+        u.kecamatan = kecamatan;
+        u.address = address;
+        u.vehicle = vehicle == null ? "" : vehicle;
+        u.passwordHash = passwordHash;
+        u.createdAt = now();
+        // driver harus disetujui admin dulu
+        u.active = !User.ROLE_DRIVER.equals(u.role);
         s.put(USERS, u.id, u.toJson());
 
         if (User.ROLE_MERCHANT.equals(u.role) && restoDraft != null) {

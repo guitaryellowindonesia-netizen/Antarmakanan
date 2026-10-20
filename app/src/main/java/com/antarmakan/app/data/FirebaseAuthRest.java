@@ -39,6 +39,34 @@ public class FirebaseAuthRest {
         return call("signInWithPassword", phone, password);
     }
 
+    /** Hasil login Google */
+    public static class GoogleResult {
+        public String uid;
+        public String name;
+        public String email;
+    }
+
+    /** Masuk dengan Google ID token (dari Credential Manager). */
+    public synchronized GoogleResult signInWithGoogle(String googleIdToken) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("postBody", "id_token=" + URLEncoder.encode(googleIdToken, "UTF-8")
+                + "&providerId=google.com");
+        body.put("requestUri", "http://localhost");
+        body.put("returnSecureToken", true);
+        body.put("returnIdpCredential", true);
+        Http.Response r = Http.request("POST", BASE + "signInWithIdp?key=" + Config.FIREBASE_API_KEY,
+                body.toString(), null);
+        JSONObject o = new JSONObject(r.body.length() == 0 ? "{}" : r.body);
+        if (r.code != 200) throw new AppException(translate(o));
+        save(o.getString("idToken"), o.getString("refreshToken"),
+                o.optLong("expiresIn", 3600), o.getString("localId"));
+        GoogleResult g = new GoogleResult();
+        g.uid = o.getString("localId");
+        g.name = o.optString("displayName", o.optString("fullName", ""));
+        g.email = o.optString("email", "");
+        return g;
+    }
+
     private String call(String action, String phone, String password) throws Exception {
         JSONObject body = new JSONObject();
         body.put("email", email(phone));

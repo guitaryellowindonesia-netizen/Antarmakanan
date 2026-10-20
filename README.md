@@ -113,6 +113,22 @@ maupun plugin Google — aman untuk CodeAssist.
 
 ---
 
+## 🔐 Login dengan Google
+1. Firebase Console → **Authentication → Sign-in method → Add new provider → Google → Enable → Save**.
+   Salin **Web client ID** (di bagian *Web SDK configuration*).
+2. **Project settings (⚙️) → General → Your apps → Add app → Android**:
+   - Package name: `com.antarmakan.app`
+   - SHA-1: `08:6A:5F:46:43:9E:AB:FC:3C:AD:F2:34:4D:E8:B7:9E:75:4A:49:2B`
+   (Tidak perlu mengunduh google-services.json.)
+3. Isi `GOOGLE_WEB_CLIENT_ID` di `Config.java`.
+
+Pengguna Google baru diminta melengkapi No HP, alamat, dan peran saat pertama masuk.
+
+> APK ditandatangani dengan `app/antarmakan.keystore` agar SHA-1 tetap. Sebelum upload ke
+> Play Store, gunakan kunci rilis yang dirahasiakan (jangan disimpan di repo publik).
+
+---
+
 ## 🔑 Akun demo (mode offline)
 | Peran | No HP | Sandi |
 |---|---|---|

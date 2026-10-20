@@ -12,6 +12,7 @@ public class User {
     public String id = "";
     public String name = "";
     public String phone = "";
+    public String email = "";        // akun Google
     public String role = ROLE_CUSTOMER;
     public String address = "";
     public String kecamatan = "";
@@ -45,6 +46,7 @@ public class User {
         o.put("id", id);
         o.put("name", name);
         o.put("phone", phone);
+        if (email.length() > 0) o.put("email", email);
         o.put("role", role);
         o.put("address", address);
         o.put("kecamatan", kecamatan);
@@ -64,6 +66,7 @@ public class User {
         u.id = o.optString("id");
         u.name = o.optString("name");
         u.phone = o.optString("phone");
+        u.email = o.optString("email");
         u.role = o.optString("role", ROLE_CUSTOMER);
         u.address = o.optString("address");
         u.kecamatan = o.optString("kecamatan");
