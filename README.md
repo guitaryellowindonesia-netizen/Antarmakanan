@@ -1,4 +1,4 @@
-# 🛵 AntarMakan — Aplikasi Pesan-Antar Makanan Khusus Kabupaten
+# 🛵 AntarMakan — Aplikasi Pesan-Antar Makanan Kabupaten Dharmasraya
 
 Aplikasi Android mirip GrabFood/GoFood, ditulis dengan **Java murni** (tanpa library tambahan)
 agar mudah dibuka & di-build di **CodeAssist / AIDE / Android Studio**.
@@ -74,8 +74,12 @@ Open folder `AntarMakan` → Run.
 
 ---
 
-## 🗺️ Mengganti ke Kabupaten Anda
-Edit **`app/src/main/java/com/antarmakan/app/Config.java`**:
+## 🗺️ Wilayah Layanan: Kabupaten Dharmasraya
+Melayani 11 kecamatan: Pulau Punjung, Sitiung, Koto Salak, Padang Laweh, Tiumang, Koto Baru,
+Sembilan Koto, Timpeh, Koto Besar, Asam Jujuhan, Sungai Rumbai.
+
+Koordinat tiap kecamatan masih **perkiraan**; perbaiki dari Google Maps agar ongkir lebih akurat.
+Untuk mengubah wilayah/tarif, edit **`app/src/main/java/com/antarmakan/app/Config.java`**:
 - `NAMA_KABUPATEN` — nama kabupaten
 - `KECAMATAN` — daftar kecamatan + koordinat titik tengah (lihat di Google Maps: tekan lama → salin angka)
 - `ONGKIR_DASAR`, `ONGKIR_PER_KM`, `BIAYA_LAYANAN`, `KOMISI_PERSEN_*`

@@ -38,13 +38,13 @@ class Seeder {
             merchantId = "demo_mitra";
         }
 
-        Restaurant r1 = resto("demo_r1", merchantId, "Warung Nasi Bu Sari", "Nasi",
-                "🍛", "Masakan rumahan, nasi rames & lauk pauk", kec(0), "06:00", "22:00", 4.7, 32);
-        menu(r1, "Nasi Rames Komplit", "Nasi, ayam goreng, sayur, sambal", 18000, "Makanan", "🍛", true);
-        menu(r1, "Nasi Ayam Bakar", "Ayam bakar kecap + lalapan", 22000, "Makanan", "🍗", true);
-        menu(r1, "Nasi Telur Balado", "Telur balado pedas manis", 13000, "Makanan", "🥚", false);
-        menu(r1, "Sayur Asem", "Porsi keluarga", 8000, "Lauk", "🥬", false);
-        menu(r1, "Tempe & Tahu Goreng", "Isi 4 potong", 5000, "Lauk", "🧈", false);
+        Restaurant r1 = resto("demo_r1", merchantId, "Rumah Makan Padang Bu Sari", "Nasi",
+                "🍛", "Masakan Padang: rendang, gulai, dendeng balado", kec(0), "06:00", "22:00", 4.7, 32);
+        menu(r1, "Nasi Rendang", "Nasi, rendang daging, sayur, sambal ijo", 25000, "Makanan", "🍛", true);
+        menu(r1, "Nasi Ayam Pop", "Ayam pop + sambal + daun singkong", 22000, "Makanan", "🍗", true);
+        menu(r1, "Nasi Dendeng Balado", "Dendeng sapi balado", 26000, "Makanan", "🥚", false);
+        menu(r1, "Gulai Tunjang", "Porsi tambahan", 15000, "Lauk", "🥬", false);
+        menu(r1, "Perkedel Kentang", "Isi 2", 5000, "Lauk", "🧈", false);
         menu(r1, "Es Teh Manis", "", 4000, "Minuman", "🧋", false);
         menu(r1, "Es Jeruk", "Jeruk peras asli", 6000, "Minuman", "🍊", false);
 
@@ -78,11 +78,11 @@ class Seeder {
         menu(r5, "Roti Bakar Coklat Keju", "", 14000, "Makanan", "🍞", true);
         menu(r5, "Pisang Goreng Madu", "", 12000, "Makanan", "🍌", false);
 
-        Restaurant r6 = resto("demo_r6", "", "Seafood Pesisir Bang Ucok", "Seafood",
-                "🦐", "Ikan bakar, cumi, udang segar tiap hari", kec(5), "11:00", "22:00", 4.4, 23);
+        Restaurant r6 = resto("demo_r6", "", "Ikan Bakar Batanghari Bang Ucok", "Seafood",
+                "🐟", "Ikan bakar & gulai ikan sungai segar tiap hari", kec(5), "11:00", "22:00", 4.4, 23);
         menu(r6, "Ikan Bakar + Nasi", "Ikan nila / gurame", 30000, "Makanan", "🐟", true);
-        menu(r6, "Cumi Goreng Tepung", "", 28000, "Makanan", "🦑", false);
-        menu(r6, "Udang Saus Padang", "", 35000, "Makanan", "🦐", true);
+        menu(r6, "Gulai Ikan Patin", "Patin segar Sungai Batanghari", 28000, "Makanan", "🐟", true);
+        menu(r6, "Pangek Ikan Mas", "", 30000, "Makanan", "🐟", false);
         menu(r6, "Kelapa Muda", "", 10000, "Minuman", "🥥", false);
 
         Restaurant r7 = resto("demo_r7", "", "Jajanan Pasar Mbok Yem", "Jajanan",

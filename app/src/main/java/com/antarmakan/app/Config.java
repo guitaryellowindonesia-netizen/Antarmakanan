@@ -14,7 +14,7 @@ public final class Config {
 
     /** Nama aplikasi & wilayah layanan */
     public static final String NAMA_APLIKASI = "AntarMakan";
-    public static final String NAMA_KABUPATEN = "Kabupaten Anda";
+    public static final String NAMA_KABUPATEN = "Kabupaten Dharmasraya";
 
     /**
      * ------------------------------------------------------------
@@ -49,13 +49,19 @@ public final class Config {
      * Ganti dengan kecamatan di kabupaten Anda.
      */
     public static final String[][] KECAMATAN = {
-            {"Kota",        "-6.9000", "107.6000"},
-            {"Utara",       "-6.8550", "107.6100"},
-            {"Selatan",     "-6.9500", "107.5900"},
-            {"Timur",       "-6.9050", "107.6600"},
-            {"Barat",       "-6.8950", "107.5400"},
-            {"Pesisir",     "-6.8200", "107.5600"},
-            {"Pegunungan",  "-6.9900", "107.6500"},
+            // Koordinat = PERKIRAAN titik tengah/ibu kota kecamatan.
+            // Silakan perbaiki dari Google Maps agar ongkir lebih akurat.
+            {"Pulau Punjung", "-1.0330", "101.6880"},
+            {"Sitiung",       "-1.0800", "101.6300"},
+            {"Koto Salak",    "-1.1200", "101.6700"},
+            {"Padang Laweh",  "-1.1300", "101.7200"},
+            {"Tiumang",       "-1.1300", "101.5400"},
+            {"Koto Baru",     "-1.1800", "101.5800"},
+            {"Sembilan Koto", "-0.9200", "101.6200"},
+            {"Timpeh",        "-1.0500", "101.4800"},
+            {"Koto Besar",    "-1.3300", "101.4800"},
+            {"Asam Jujuhan",  "-1.3400", "101.7200"},
+            {"Sungai Rumbai", "-1.4200", "101.5100"},
     };
 
     /** Tarif ongkos kirim */
