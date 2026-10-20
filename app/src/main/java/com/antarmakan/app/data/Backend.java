@@ -2,9 +2,8 @@ package com.antarmakan.app.data;
 
 import android.content.Context;
 
-import com.antarmakan.app.Config;
 
-/** Memilih penyimpanan: online (Firebase) atau offline (SQLite). */
+/** Koneksi ke server Firebase. */
 public final class Backend {
     private Backend() {}
 
@@ -15,12 +14,8 @@ public final class Backend {
     public static synchronized Repo repo(Context c) {
         if (repo == null) {
             Context app = c.getApplicationContext();
-            if (Config.isOnline()) {
-                auth = new FirebaseAuthRest(app);
-                store = new FirebaseStore(auth);
-            } else {
-                store = new LocalStore(app);
-            }
+            auth = new FirebaseAuthRest(app);
+            store = new FirebaseStore(auth);
             repo = new Repo(app, store, auth);
         }
         return repo;

@@ -56,10 +56,6 @@ public class Repo {
         this.auth = auth;
     }
 
-    public boolean isOnline() {
-        return auth != null;
-    }
-
     private static long now() {
         return System.currentTimeMillis();
     }
@@ -87,18 +83,8 @@ public class Repo {
         if (password.length() < 6) throw new AppException("Kata sandi minimal 6 karakter");
         validateProfile(name, phone);
         phone = normalizePhone(phone);
-        String uid;
-        String hash = "";
-        if (isOnline()) {
-            uid = auth.signUp(phone, password);
-        } else {
-            if (!s.query(USERS, "phone", phone).isEmpty()) {
-                throw new AppException("Nomor HP sudah terdaftar");
-            }
-            uid = Ids.newId();
-            hash = Ids.sha256(phone + ":" + password);
-        }
-        return createProfile(uid, name, phone, role, kecamatan, address, vehicle, restoDraft, hash, "");
+        String uid = auth.signUp(phone, password);
+        return createProfile(uid, name, phone, role, kecamatan, address, vehicle, restoDraft, "", "");
     }
 
     private static void validateProfile(String name, String phone) {
@@ -108,7 +94,6 @@ public class Repo {
 
     /** Langkah 1 login Google: masuk ke Firebase. Mengembalikan profil jika sudah pernah daftar. */
     public GoogleLogin loginWithGoogle(String googleIdToken) throws Exception {
-        if (!isOnline()) throw new AppException("Login Google hanya tersedia saat online");
         FirebaseAuthRest.GoogleResult g = auth.signInWithGoogle(googleIdToken);
         GoogleLogin out = new GoogleLogin();
         out.uid = g.uid;
@@ -134,6 +119,10 @@ public class Repo {
                                       String kecamatan, String address, String vehicle,
                                       Restaurant restoDraft) throws Exception {
         validateProfile(name, phone);
+        // nomor admin wajib daftar lewat No HP + sandi (nomor Google tidak diverifikasi)
+        if (isAdminPhone(normalizePhone(phone))) {
+            throw new AppException("Nomor ini khusus admin. Daftar dengan No HP & kata sandi.");
+        }
         User other = userByPhone(phone);
         if (other != null && !other.id.equals(uid)) throw new AppException("Nomor HP sudah dipakai akun lain");
         return createProfile(uid, name, normalizePhone(phone), role, kecamatan, address, vehicle,
@@ -172,20 +161,10 @@ public class Repo {
 
     public User login(String phone, String password) throws Exception {
         phone = normalizePhone(phone);
-        User u;
-        if (isOnline()) {
-            String uid = auth.signIn(phone, password);
-            JSONObject o = s.get(USERS, uid);
-            if (o == null) throw new AppException("Data akun tidak ditemukan");
-            u = User.fromJson(o);
-        } else {
-            List<JSONObject> found = s.query(USERS, "phone", phone);
-            if (found.isEmpty()) throw new AppException("Nomor HP belum terdaftar");
-            u = User.fromJson(found.get(0));
-            if (!u.passwordHash.equals(Ids.sha256(phone + ":" + password))) {
-                throw new AppException("Kata sandi salah");
-            }
-        }
+        String uid = auth.signIn(phone, password);
+        JSONObject o = s.get(USERS, uid);
+        if (o == null) throw new AppException("Data akun tidak ditemukan");
+        User u = User.fromJson(o);
         if (!u.active && !u.isDriver()) throw new AppException("Akun Anda dinonaktifkan admin");
         Session.login(ctx, u.id, u.role);
         return u;
@@ -1026,17 +1005,5 @@ public class Repo {
             }
         });
         return out;
-    }
-
-    // =====================================================================
-    //  DATA CONTOH
-    // =====================================================================
-
-    public boolean hasAnyResto() throws Exception {
-        return !s.list(RESTOS).isEmpty();
-    }
-
-    public void seedDemo(boolean withAccounts) throws Exception {
-        new Seeder(s).seed(withAccounts);
     }
 }

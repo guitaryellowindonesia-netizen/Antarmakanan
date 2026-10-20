@@ -20,22 +20,17 @@ public final class Config {
      * ------------------------------------------------------------
      *  KONEKSI ONLINE (FIREBASE)
      * ------------------------------------------------------------
-     * Biarkan KOSONG ("") untuk MODE DEMO OFFLINE (data hanya di HP ini).
-     * Isi keduanya agar aplikasi ONLINE (semua HP terhubung).
-     * Cara mendapatkan: lihat README.md bagian "Membuat Online".
-     *
-     * Contoh:
-     *   FIREBASE_DB_URL  = "https://antarmakan-123-default-rtdb.asia-southeast1.firebasedatabase.app"
-     *   FIREBASE_API_KEY = "AIzaSy...."
+     * Server online aplikasi (Firebase project: antarmakan-dharmasraya).
      */
-    public static final String FIREBASE_DB_URL = "";
-    public static final String FIREBASE_API_KEY = "";
+    public static final String FIREBASE_DB_URL =
+            "https://antarmakan-dharmasraya-default-rtdb.asia-southeast1.firebasedatabase.app";
+    public static final String FIREBASE_API_KEY = "AIzaSyB_2rfXzEidtCsN2Gkl6E23vHH1f5Dq14E";
 
     /**
      * Nomor HP yang otomatis menjadi ADMIN saat mendaftar.
      * Ganti dengan nomor HP Anda sendiri.
      */
-    public static final String[] ADMIN_PHONES = {"081200000000"};
+    public static final String[] ADMIN_PHONES = {"082286504869"};
 
     /**
      * Login dengan Google (opsional, hanya mode online).
@@ -43,7 +38,8 @@ public final class Config {
      * Authentication > Sign-in method > Google > Web SDK configuration.
      * Contoh: "1234567890-abcdef.apps.googleusercontent.com"
      */
-    public static final String GOOGLE_WEB_CLIENT_ID = "";
+    public static final String GOOGLE_WEB_CLIENT_ID =
+            "974664465693-q8p5oasopvl6f25uvmetf2nj1dbsbjho.apps.googleusercontent.com";
 
     public static boolean googleLoginEnabled() {
         return isOnline() && GOOGLE_WEB_CLIENT_ID.length() > 0;
@@ -54,7 +50,7 @@ public final class Config {
     }
 
     /** Nomor WhatsApp / telepon layanan pelanggan */
-    public static final String CS_PHONE = "6281234567890";
+    public static final String CS_PHONE = "6282286504869";
 
     /**
      * Daftar kecamatan yang dilayani: {nama, latitude, longitude}.
@@ -91,8 +87,8 @@ public final class Config {
 
     /** Petunjuk transfer untuk top up saldo (diverifikasi manual oleh admin) */
     public static final String INFO_TRANSFER =
-            "Transfer ke:\nBank BRI 0000-01-000000-00-0\na.n. Admin AntarMakan\n"
-            + "atau DANA/OVO 081200000000\n\nSaldo masuk setelah dicek admin.";
+            "Transfer ke:\n082286504869\na.n. Yogi Ismayadi\n\n"
+            + "Saldo masuk setelah dicek admin.";
 
     /** Minimal top up saldo */
     public static final int MIN_TOPUP = 10000;

@@ -79,32 +79,6 @@ public class LoginActivity extends BaseActivity {
             });
             card.addView(google);
         }
-
-        if (!Config.isOnline()) {
-            LinearLayout demo = formCard(page);
-            demo.addView(Ui.title(this, "Akun demo (mode offline)"));
-            demo.addView(Ui.muted(this, "Ketuk untuk mengisi otomatis. Untuk online, isi Firebase di Config.java"));
-            demo.addView(Ui.spacer(this, 6));
-            addDemo(demo, "🙋 Pelanggan", "081111111111", "123456");
-            addDemo(demo, "🏪 Mitra Resto", "082222222222", "123456");
-            addDemo(demo, "🛵 Driver", "083333333333", "123456");
-            addDemo(demo, "🛠️ Admin", Config.ADMIN_PHONES[0], "admin123");
-        }
-    }
-
-    private void addDemo(LinearLayout parent, String label, final String ph, final String pw) {
-        LinearLayout row = Ui.hbox(this);
-        row.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 6));
-        row.addView(Ui.body(this, label), Ui.weight(1));
-        row.addView(Ui.muted(this, ph + " / " + pw));
-        row.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                phone.setText(ph);
-                pass.setText(pw);
-            }
-        });
-        parent.addView(row, Ui.matchWrap());
     }
 
     private void googleLogin() {

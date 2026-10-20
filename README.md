@@ -43,7 +43,6 @@ Satu aplikasi untuk 4 peran: **Pelanggan, Mitra Resto, Driver, Admin**.
 - Kelola pengguna, koreksi saldo, lihat & batalkan pesanan
 - Kelola kode promo
 - Setujui top up & penarikan saldo
-- Tombol "Isi data contoh"
 
 ### 💰 Bagi hasil otomatis saat pesanan selesai
 | Bayar | Resto | Driver |
@@ -91,8 +90,8 @@ Untuk mengubah wilayah/tarif, edit **`app/src/main/java/com/antarmakan/app/Confi
 
 ## 🌐 Membuat Online (semua HP terhubung)
 
-Tanpa pengaturan, aplikasi berjalan **mode demo offline** (data hanya di HP itu, dengan akun demo).
-Agar pelanggan, resto, dan driver di HP berbeda saling terhubung, gunakan **Firebase** (gratis):
+Aplikasi sudah tersambung ke Firebase project **antarmakan-dharmasraya** (lihat `Config.java`).
+Langkah di bawah hanya untuk referensi bila ingin memakai project Firebase lain:
 
 1. Buka https://console.firebase.google.com → **Add project** (mis. `antarmakan`).
 2. Menu **Build → Authentication → Get started → Sign-in method → Email/Password → Enable**.
@@ -105,8 +104,7 @@ Agar pelanggan, resto, dan driver di HP berbeda saling terhubung, gunakan **Fire
    public static final String FIREBASE_DB_URL = "https://antarmakan-xxx-default-rtdb.asia-southeast1.firebasedatabase.app";
    public static final String FIREBASE_API_KEY = "AIzaSy....";
    ```
-8. Build ulang APK. Daftar memakai nomor yang ada di `ADMIN_PHONES` → Anda jadi Admin.
-   Di Admin → tab **Lainnya → Isi data contoh** bila ingin data contoh.
+8. Build ulang APK. Daftar memakai nomor yang ada di `ADMIN_PHONES` (dengan No HP + kata sandi) → Anda jadi Admin.
 
 Aplikasi memakai Firebase lewat REST API (HTTP biasa), jadi **tidak perlu** `google-services.json`
 maupun plugin Google — aman untuk CodeAssist.
@@ -129,19 +127,6 @@ Pengguna Google baru diminta melengkapi No HP, alamat, dan peran saat pertama ma
 
 ---
 
-## 🔑 Akun demo (mode offline)
-| Peran | No HP | Sandi |
-|---|---|---|
-| Pelanggan | 081111111111 | 123456 |
-| Mitra Resto | 082222222222 | 123456 |
-| Driver | 083333333333 | 123456 |
-| Admin | 081200000000 | admin123 |
-
-Di mode offline Anda bisa mencoba seluruh alur di satu HP: pesan sebagai pelanggan → keluar →
-masuk sebagai mitra untuk menerima → masuk sebagai driver untuk mengantar.
-
----
-
 ## 📁 Struktur Kode
 ```
 app/src/main/java/com/antarmakan/app/
@@ -150,10 +135,8 @@ app/src/main/java/com/antarmakan/app/
 ├── data/
 │   ├── Repo.java            ← semua logika bisnis (pesanan, saldo, promo, ...)
 │   ├── Store.java           ← antarmuka penyimpanan
-│   ├── LocalStore.java      ← SQLite (offline)
 │   ├── FirebaseStore.java   ← Firebase Realtime Database (online, REST)
-│   ├── FirebaseAuthRest.java← login Firebase (REST)
-│   └── Seeder.java          ← data contoh
+│   └── FirebaseAuthRest.java← login Firebase (REST)
 ├── util/                    ← Ui (pembuat tampilan), Cart, Fmt, Geo (jarak & ongkir), Async
 └── ui/
     ├── auth/                ← Splash, Login, Daftar

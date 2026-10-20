@@ -6,9 +6,7 @@ import java.util.List;
 
 /**
  * Penyimpanan data berbentuk koleksi dokumen JSON.
- * Ada dua implementasi:
- *  - LocalStore    : SQLite di HP (mode demo offline)
- *  - FirebaseStore : Firebase Realtime Database (mode online)
+ * Implementasi: FirebaseStore (Firebase Realtime Database).
  * Semua method bersifat blocking, panggil dari background thread (lihat Async).
  */
 public interface Store {

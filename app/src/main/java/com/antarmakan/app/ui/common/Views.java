@@ -215,9 +215,7 @@ public final class Views {
                 new android.app.AlertDialog.Builder(a)
                         .setTitle(Config.NAMA_APLIKASI)
                         .setMessage("Aplikasi pesan-antar makanan khusus " + Config.NAMA_KABUPATEN
-                                + ".\n\nMelayani " + Config.KECAMATAN.length + " kecamatan.\nMode: "
-                                + (Config.isOnline() ? "Online (Firebase)" : "Demo offline")
-                                + "\nVersi 1.0")
+                                + ".\n\nMelayani " + Config.KECAMATAN.length + " kecamatan.\nVersi 1.1")
                         .setPositiveButton("OK", null)
                         .show();
             }

@@ -510,29 +510,6 @@ public class AdminMainActivity extends TabbedActivity {
             page.addView(c);
         }
 
-        // data contoh & akun
-        page.addView(Ui.section(this, "Pengaturan"));
-        LinearLayout tools = Ui.card(this);
-        tools.addView(Views.menuRow(this, "🧪", "Isi data contoh (resto, menu, promo)", new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Ui.confirm(AdminMainActivity.this, "Isi data contoh",
-                        "Tambahkan 8 resto contoh beserta menu & promo? Bisa dihapus nanti.", "Isi",
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                exec(new Async.Task<Boolean>() {
-                                    @Override
-                                    public Boolean run() throws Exception {
-                                        repo.seedDemo(false);
-                                        return true;
-                                    }
-                                }, "Data contoh ditambahkan");
-                            }
-                        });
-            }
-        }));
-        page.addView(tools);
         Views.accountSection(this, me, page);
         show(TAB_MORE, page);
     }
