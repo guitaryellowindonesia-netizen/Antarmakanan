@@ -10,6 +10,7 @@ public class MenuItem {
     public String description = "";
     public String category = "Makanan";
     public String emoji = "🍽️";
+    public String imageId = "";   // foto (koleksi "images")
     public long price;
     public boolean available = true;
     public boolean recommended;
@@ -22,6 +23,7 @@ public class MenuItem {
         o.put("description", description);
         o.put("category", category);
         o.put("emoji", emoji);
+        o.put("imageId", imageId);
         o.put("price", price);
         o.put("available", available);
         o.put("recommended", recommended);
@@ -36,6 +38,7 @@ public class MenuItem {
         m.description = o.optString("description");
         m.category = o.optString("category", "Makanan");
         m.emoji = o.optString("emoji", "🍽️");
+        m.imageId = o.optString("imageId");
         m.price = o.optLong("price");
         m.available = o.optBoolean("available", true);
         m.recommended = o.optBoolean("recommended");

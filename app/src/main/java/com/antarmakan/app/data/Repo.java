@@ -45,6 +45,7 @@ public class Repo {
     public static final String MSGS = "messages";
     public static final String WALLET = "wallet";
     public static final String TOPUPS = "topups";
+    public static final String IMAGES = "images";
 
     private final Context ctx;
     private final Store s;
@@ -444,7 +445,12 @@ public class Repo {
     }
 
     public void deleteResto(String restoId) throws Exception {
-        for (MenuItem m : menus(restoId)) s.delete(MENUS, m.id);
+        for (MenuItem m : menus(restoId)) {
+            deleteImage(m.imageId);
+            s.delete(MENUS, m.id);
+        }
+        JSONObject r = s.get(RESTOS, restoId);
+        if (r != null) deleteImage(r.optString("imageId"));
         s.delete(RESTOS, restoId);
     }
 
@@ -490,6 +496,8 @@ public class Repo {
     }
 
     public void deleteMenu(String id) throws Exception {
+        JSONObject o = s.get(MENUS, id);
+        if (o != null) deleteImage(o.optString("imageId"));
         s.delete(MENUS, id);
     }
 
@@ -976,6 +984,31 @@ public class Repo {
                 return cur;
             }
         });
+    }
+
+    // =====================================================================
+    //  FOTO
+    // =====================================================================
+
+    /** Simpan foto (base64 JPEG), kembalikan id-nya. */
+    public String uploadImage(String base64) throws Exception {
+        if (base64.length() > 400000) throw new AppException("Ukuran foto terlalu besar");
+        String id = Ids.newId();
+        JSONObject o = new JSONObject();
+        o.put("id", id);
+        o.put("data", base64);
+        o.put("createdAt", now());
+        s.put(IMAGES, id, o);
+        return id;
+    }
+
+    public String imageData(String id) throws Exception {
+        JSONObject o = s.get(IMAGES, id);
+        return o == null ? null : o.optString("data", null);
+    }
+
+    public void deleteImage(String id) throws Exception {
+        if (id != null && id.length() > 0) s.delete(IMAGES, id);
     }
 
     // =====================================================================

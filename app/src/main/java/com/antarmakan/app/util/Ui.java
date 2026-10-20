@@ -16,6 +16,8 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -272,6 +274,46 @@ public final class Ui {
         p.setMargins(0, 0, dp(c, 12), 0);
         t.setLayoutParams(p);
         return t;
+    }
+
+    /** Foto (jika ada) dengan emoji sebagai cadangan, ukuran persegi. */
+    public static FrameLayout photo(Context c, String imageId, String emoji, int sizeDp) {
+        FrameLayout f = photoFrame(c, imageId, emoji, sizeDp * 0.45f);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(c, sizeDp), dp(c, sizeDp));
+        p.setMargins(0, 0, dp(c, 12), 0);
+        f.setLayoutParams(p);
+        return f;
+    }
+
+    /** Foto lebar (sampul resto / pratinjau). */
+    public static FrameLayout banner(Context c, String imageId, String emoji, int heightDp) {
+        FrameLayout f = photoFrame(c, imageId, emoji, 40);
+        f.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, heightDp)));
+        return f;
+    }
+
+    private static FrameLayout photoFrame(Context c, String imageId, String emoji, float emojiSp) {
+        FrameLayout f = new FrameLayout(c);
+        f.setBackground(rounded(PRIMARY_LIGHT, dp(c, 12)));
+        if (android.os.Build.VERSION.SDK_INT >= 21) f.setClipToOutline(true);
+        TextView t = new TextView(c);
+        t.setText(emoji);
+        t.setGravity(Gravity.CENTER);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, emojiSp);
+        f.addView(t, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        ImageView iv = new ImageView(c);
+        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        iv.setVisibility(View.GONE);
+        f.addView(iv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        Images.load(iv, imageId);
+        return f;
+    }
+
+    /** ImageView di dalam frame foto (untuk pratinjau di form). */
+    public static ImageView photoImage(FrameLayout f) {
+        return (ImageView) f.getChildAt(1);
     }
 
     public static TextView keyValue(Context c, LinearLayout parent, String key, String value,

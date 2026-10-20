@@ -201,7 +201,7 @@ public class MerchantMainActivity extends TabbedActivity {
     private View menuCard(final String restoId, final MenuItem m) {
         LinearLayout card = Ui.card(this);
         LinearLayout row = Ui.hbox(this);
-        row.addView(Ui.emojiIcon(this, m.emoji, 48));
+        row.addView(Ui.photo(this, m.imageId, m.emoji, 56));
         LinearLayout info = Ui.vbox(this);
         info.addView(Ui.text(this, (m.recommended ? "⭐ " : "") + m.name, 15, Ui.TEXT, true));
         info.addView(Ui.muted(this, m.category + " • " + Fmt.rp(m.price)));

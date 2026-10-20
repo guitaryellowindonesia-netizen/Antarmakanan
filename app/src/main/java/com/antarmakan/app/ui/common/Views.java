@@ -25,7 +25,7 @@ public final class Views {
     public static LinearLayout restoCard(final Activity a, final Restaurant r, boolean fav) {
         LinearLayout card = Ui.card(a);
         LinearLayout row = Ui.hbox(a);
-        row.addView(Ui.emojiIcon(a, r.emoji, 64));
+        row.addView(Ui.photo(a, r.imageId, r.emoji, 72));
         LinearLayout info = Ui.vbox(a);
         LinearLayout top = Ui.hbox(a);
         TextView name = Ui.text(a, r.name, 16, Ui.TEXT, true);

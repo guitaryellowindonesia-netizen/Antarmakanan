@@ -196,7 +196,7 @@ public class AdminMainActivity extends TabbedActivity {
     private View restoAdminCard(final Restaurant r) {
         LinearLayout card = Ui.card(this);
         LinearLayout row = Ui.hbox(this);
-        row.addView(Ui.emojiIcon(this, r.emoji, 44));
+        row.addView(Ui.photo(this, r.imageId, r.emoji, 48));
         LinearLayout info = Ui.vbox(this);
         info.addView(Ui.text(this, r.name, 15, Ui.TEXT, true));
         info.addView(Ui.muted(this, r.category + " • Kec. " + r.kecamatan + " • " + r.openHour + "-" + r.closeHour));

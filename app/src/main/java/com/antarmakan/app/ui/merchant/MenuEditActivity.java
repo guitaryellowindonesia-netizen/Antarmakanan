@@ -57,7 +57,8 @@ public class MenuEditActivity extends BaseFormActivity {
         c.addView(Ui.label(this, "Kategori"));
         final Spinner cat = Ui.spinner(this, CATEGORIES, Ui.indexOf(CATEGORIES, m.category));
         c.addView(cat);
-        final EditText emoji = field(c, "Ikon/emoji", m.emoji, Ui.edit(this, "🍛"));
+        photoSection(c, "Foto menu", m.imageId, m.emoji);
+        final EditText emoji = field(c, "Ikon/emoji (dipakai jika tanpa foto)", m.emoji, Ui.edit(this, "🍛"));
         final CheckBox avail = new CheckBox(this);
         avail.setText("Tersedia (bisa dipesan)");
         avail.setChecked(m.available);
@@ -82,7 +83,10 @@ public class MenuEditActivity extends BaseFormActivity {
                 action("Menyimpan...", new Async.Task<Boolean>() {
                     @Override
                     public Boolean run() throws Exception {
+                        String old = m.imageId;
+                        m.imageId = applyPhoto(old);
                         repo.saveMenu(m);
+                        if (!old.equals(m.imageId)) repo.deleteImage(old);
                         return true;
                     }
                 }, new Async.Callback<Boolean>() {

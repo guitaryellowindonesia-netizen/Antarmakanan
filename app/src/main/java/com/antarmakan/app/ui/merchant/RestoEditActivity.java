@@ -64,6 +64,7 @@ public class RestoEditActivity extends BaseFormActivity {
         final String[] cats = Arrays.copyOfRange(Config.KATEGORI, 1, Config.KATEGORI.length);
         final Spinner cat = Ui.spinner(this, cats, Ui.indexOf(cats, r.category));
         c.addView(cat);
+        photoSection(c, "Foto resto (sampul)", r.imageId, r.emoji);
         final EditText emoji = field(c, "Ikon/emoji (kosongkan = otomatis)", r.emoji, Ui.edit(this, "🍛"));
         c.addView(Ui.label(this, "Kecamatan"));
         final Spinner kec = Ui.spinner(this, Config.namaKecamatan(), Config.indexKecamatan(r.kecamatan));
@@ -128,7 +129,10 @@ public class RestoEditActivity extends BaseFormActivity {
                                 r.ownerId = "";
                             }
                         }
+                        String old = r.imageId;
+                        r.imageId = applyPhoto(old);
                         repo.saveResto(r);
+                        if (!old.equals(r.imageId)) repo.deleteImage(old);
                         return true;
                     }
                 }, new Async.Callback<Boolean>() {

@@ -15,6 +15,7 @@ public class Restaurant {
     public String address = "";
     public String phone = "";
     public String emoji = "🍽️";
+    public String imageId = "";   // foto (koleksi "images")
     public String openHour = "08:00";
     public String closeHour = "21:00";
     public boolean isOpen = true;     // saklar buka/tutup dari mitra
@@ -47,6 +48,7 @@ public class Restaurant {
         o.put("address", address);
         o.put("phone", phone);
         o.put("emoji", emoji);
+        o.put("imageId", imageId);
         o.put("openHour", openHour);
         o.put("closeHour", closeHour);
         o.put("isOpen", isOpen);
@@ -68,6 +70,7 @@ public class Restaurant {
         r.address = o.optString("address");
         r.phone = o.optString("phone");
         r.emoji = o.optString("emoji", "🍽️");
+        r.imageId = o.optString("imageId");
         r.openHour = o.optString("openHour", "08:00");
         r.closeHour = o.optString("closeHour", "21:00");
         r.isOpen = o.optBoolean("isOpen", true);

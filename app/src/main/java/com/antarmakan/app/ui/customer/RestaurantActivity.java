@@ -96,7 +96,13 @@ public class RestaurantActivity extends BaseActivity {
         TextView em = Ui.text(this, resto.emoji, 48, Color.WHITE, false);
         em.setGravity(Gravity.CENTER);
         head.addView(em);
-        content.addView(head);
+        if (resto.imageId.length() > 0) {
+            android.widget.FrameLayout cover = Ui.banner(this, resto.imageId, resto.emoji, 200);
+            cover.setBackgroundColor(Ui.PRIMARY_LIGHT);
+            content.addView(cover);
+        } else {
+            content.addView(head);
+        }
 
         LinearLayout info = Ui.card(this);
         LinearLayout.LayoutParams lp = Ui.margins(this, 12, -32, 12, 6);
@@ -163,7 +169,7 @@ public class RestaurantActivity extends BaseActivity {
     private View menuRow(final MenuItem m) {
         LinearLayout card = Ui.card(this);
         LinearLayout row = Ui.hbox(this);
-        row.addView(Ui.emojiIcon(this, m.emoji, 56));
+        row.addView(Ui.photo(this, m.imageId, m.emoji, 72));
         LinearLayout info = Ui.vbox(this);
         info.addView(Ui.text(this, m.name, 15, Ui.TEXT, true));
         if (m.description.length() > 0) info.addView(Ui.muted(this, m.description));

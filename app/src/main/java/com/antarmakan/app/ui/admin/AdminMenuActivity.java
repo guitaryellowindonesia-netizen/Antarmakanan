@@ -54,7 +54,7 @@ public class AdminMenuActivity extends BaseActivity {
                 for (final MenuItem m : list) {
                     LinearLayout c = Ui.card(AdminMenuActivity.this);
                     LinearLayout row = Ui.hbox(AdminMenuActivity.this);
-                    row.addView(Ui.emojiIcon(AdminMenuActivity.this, m.emoji, 44));
+                    row.addView(Ui.photo(AdminMenuActivity.this, m.imageId, m.emoji, 48));
                     LinearLayout info = Ui.vbox(AdminMenuActivity.this);
                     info.addView(Ui.text(AdminMenuActivity.this, m.name, 15, Ui.TEXT, true));
                     info.addView(Ui.muted(AdminMenuActivity.this, m.category + " • " + Fmt.rp(m.price)
