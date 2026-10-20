@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.antarmakan.app">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".ui.auth.SplashActivity"
+            android:exported="true"
+            android:theme="@style/AppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ui.auth.LoginActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.auth.RegisterActivity" android:windowSoftInputMode="adjustResize" />
+
+        <activity android:name=".ui.customer.CustomerMainActivity" android:label="@string/app_name"
+            android:windowSoftInputMode="adjustPan" />
+        <activity android:name=".ui.customer.RestaurantActivity" />
+        <activity android:name=".ui.customer.CartActivity" android:windowSoftInputMode="adjustResize" />
+
+        <activity android:name=".ui.merchant.MerchantMainActivity" android:label="@string/app_name" />
+        <activity android:name=".ui.merchant.MenuEditActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.merchant.RestoEditActivity" android:windowSoftInputMode="adjustResize" />
+
+        <activity android:name=".ui.driver.DriverMainActivity" android:label="@string/app_name" />
+
+        <activity android:name=".ui.admin.AdminMainActivity" android:label="@string/app_name" />
+        <activity android:name=".ui.admin.AdminMenuActivity" />
+
+        <activity android:name=".ui.common.OrderDetailActivity" />
+        <activity android:name=".ui.common.ChatActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.common.ReviewsActivity" />
+        <activity android:name=".ui.common.WalletActivity" />
+        <activity android:name=".ui.common.ProfileActivity" android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

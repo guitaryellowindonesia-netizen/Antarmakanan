@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon aplikasi: lingkaran hijau dengan mangkuk & sendok -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00AA13"
+        android:pathData="M54,4a50,50 0,1 1,0 100a50,50 0,1 1,0 -100z" />
+    <!-- mangkuk -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,52 L84,52 C84,70 71,80 54,80 C37,80 24,70 24,52 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,82 L64,82 L62,86 L46,86 Z" />
+    <!-- uap -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M42,44 C38,38 46,34 42,28 M54,44 C50,38 58,34 54,28 M66,44 C62,38 70,34 66,28" />
+    <!-- aksen oranye -->
+    <path
+        android:fillColor="#FF6D00"
+        android:pathData="M30,58 L78,58 C77,61 76,63 75,65 L33,65 C32,63 31,61 30,58 Z" />
+</vector>

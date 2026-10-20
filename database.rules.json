@@ -1,0 +1,14 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "users":       { ".indexOn": ["phone", "role"] },
+    "restaurants": { ".indexOn": ["ownerId"] },
+    "menus":       { ".indexOn": ["restoId"] },
+    "orders":      { ".indexOn": ["customerId", "restoId", "driverId", "status"] },
+    "reviews":     { ".indexOn": ["restoId", "driverId"] },
+    "messages":    { ".indexOn": ["orderId"] },
+    "wallet":      { ".indexOn": ["userId"] },
+    "topups":      { ".indexOn": ["userId", "status"] }
+  }
+}
