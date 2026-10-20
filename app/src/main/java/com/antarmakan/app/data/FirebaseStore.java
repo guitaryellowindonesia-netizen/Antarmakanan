@@ -39,7 +39,14 @@ public class FirebaseStore implements Store {
         if (r.code == 400 && r.body.contains("Index not defined")) {
             throw new AppException("Index belum dibuat. Pasang Rules dari README di Firebase");
         }
-        if (r.code >= 400) throw new AppException("Server error (" + r.code + ")");
+        if (r.code >= 400) {
+            String msg = "";
+            try {
+                msg = new JSONObject(r.body).optString("error", "");
+            } catch (Exception ignored) {
+            }
+            throw new AppException("Server error (" + r.code + ")" + (msg.length() > 0 ? ": " + msg : ""));
+        }
     }
 
     @Override
@@ -94,7 +101,8 @@ public class FirebaseStore implements Store {
             if (next == null) {
                 w = Http.request("DELETE", url(col, id, null), null, ph);
             } else {
-                w = Http.request("PUT", url(col, id, "print=silent"), next.toString(), ph);
+                // catatan: print=silent tidak boleh dipakai bersama if-match (error 400)
+                w = Http.request("PUT", url(col, id, null), next.toString(), ph);
             }
             if (w.code == 412) continue; // data berubah oleh HP lain, ulangi
             check(w);
