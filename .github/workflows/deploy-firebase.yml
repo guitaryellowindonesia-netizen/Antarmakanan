@@ -1,0 +1,62 @@
+name: Deploy Server Firebase (opsional)
+
+# Memasang Cloud Functions & Rules otomatis setiap kali berubah.
+# Hanya berjalan bila Secret FIREBASE_SERVICE_ACCOUNT sudah diisi
+# (lihat README bagian "Pembayaran QRIS"). Tanpa itu, langkah ini dilewati.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'database.rules.json'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firebase.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cek kredensial
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::warning::Secret FIREBASE_SERVICE_ACCOUNT belum diisi. Deploy server dilewati."
+            echo "SKIP=1" >> $GITHUB_ENV
+          else
+            echo "$SA" > "$RUNNER_TEMP/sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> $GITHUB_ENV
+          fi
+
+      - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
+        with:
+          node-version: '20'
+
+      - name: Pasang dependensi server
+        if: env.SKIP != '1'
+        run: npm install --prefix functions --no-audit --no-fund
+
+      - name: Simpan Server Key Midtrans
+        if: env.SKIP != '1'
+        env:
+          KEY: ${{ secrets.MIDTRANS_SERVER_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            printf "%s" "$KEY" > "$RUNNER_TEMP/mtkey"
+            npx -y firebase-tools@13 functions:secrets:set MIDTRANS_SERVER_KEY \
+              --data-file "$RUNNER_TEMP/mtkey" --project antarmakan-dharmasraya --force --non-interactive
+            rm -f "$RUNNER_TEMP/mtkey"
+          fi
+
+      - name: Deploy
+        if: env.SKIP != '1'
+        env:
+          PROD: ${{ vars.MIDTRANS_PRODUCTION }}
+        run: |
+          echo "MIDTRANS_PRODUCTION=${PROD:-false}" > functions/.env
+          npx -y firebase-tools@13 deploy --only functions,database \
+            --project antarmakan-dharmasraya --force --non-interactive

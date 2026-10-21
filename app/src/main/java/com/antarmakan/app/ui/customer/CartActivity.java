@@ -186,6 +186,12 @@ public class CartActivity extends BaseActivity {
         saldo.setText("👛 Saldo " + Config.NAMA_APLIKASI + " (" + Fmt.rp(me.balance) + ")");
         payGroup.addView(cash);
         payGroup.addView(saldo);
+        if (com.antarmakan.app.util.AppSettings.QRIS_AKTIF) {
+            RadioButton qris = new RadioButton(this);
+            qris.setId(3);
+            qris.setText("📱 QRIS (GoPay, OVO, DANA, ShopeePay, m-banking)");
+            payGroup.addView(qris);
+        }
         payGroup.check(1);
         pay.addView(payGroup);
         page.addView(pay);
@@ -368,7 +374,8 @@ public class CartActivity extends BaseActivity {
             return;
         }
         final double lat = pinLat, lng = pinLng;
-        final String pay = payGroup.getCheckedRadioButtonId() == 2 ? Order.BAYAR_SALDO : Order.BAYAR_TUNAI;
+        int pid = payGroup.getCheckedRadioButtonId();
+        final String pay = pid == 2 ? Order.BAYAR_SALDO : pid == 3 ? Order.BAYAR_QRIS : Order.BAYAR_TUNAI;
         if (Order.BAYAR_SALDO.equals(pay) && me.balance < quote.total) {
             Ui.toast(this, "Saldo tidak cukup. Top up dulu di menu Akun");
             return;
@@ -378,7 +385,7 @@ public class CartActivity extends BaseActivity {
         final String n = note.getText().toString();
         final String code = quote.promo != null ? quote.promo.code : "";
         Ui.confirm(this, "Konfirmasi Pesanan",
-                "Total " + Fmt.rp(quote.total) + " dibayar " + (Order.BAYAR_SALDO.equals(pay) ? "pakai saldo" : "tunai")
+                "Total " + Fmt.rp(quote.total) + " dibayar " + (Order.BAYAR_SALDO.equals(pay) ? "pakai saldo" : Order.BAYAR_QRIS.equals(pay) ? "QRIS" : "tunai")
                         + ".\nAntar ke: " + addr + ", Kec. " + k, "Pesan", new Runnable() {
                     @Override
                     public void run() {
@@ -393,7 +400,11 @@ public class CartActivity extends BaseActivity {
                             public void onResult(Order o) {
                                 Ui.toast(CartActivity.this, "Pesanan terkirim ke resto! 🎉");
                                 com.antarmakan.app.notif.NotifCenter.ensureService(CartActivity.this);
-                                Views.openOrder(CartActivity.this, o.id);
+                                if (Order.BAYAR_QRIS.equals(o.paymentMethod)) {
+                                    QrisActivity.open(CartActivity.this, o.id);
+                                } else {
+                                    Views.openOrder(CartActivity.this, o.id);
+                                }
                                 finish();
                             }
                         });

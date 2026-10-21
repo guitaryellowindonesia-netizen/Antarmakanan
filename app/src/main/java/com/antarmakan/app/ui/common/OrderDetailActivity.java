@@ -348,7 +348,7 @@ public class OrderDetailActivity extends BaseActivity {
         }
         Ui.keyValue(this, it, "Total", Fmt.rp(order.total), true);
         Ui.keyValue(this, it, "Pembayaran",
-                Order.BAYAR_SALDO.equals(order.paymentMethod) ? "Saldo (lunas)" : "Tunai ke driver", false);
+                order.paymentLabel(), false);
         it.addView(Ui.muted(this, "Dipesan " + Fmt.date(order.createdAt)));
         page.addView(it);
     }
@@ -421,6 +421,20 @@ public class OrderDetailActivity extends BaseActivity {
 
     private void addActions(LinearLayout a) {
         final int s = order.status;
+
+        if (isCustomer() && order.awaitingPayment()) {
+            btn(a, "📱 Bayar dengan QRIS", Ui.PRIMARY, true).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    com.antarmakan.app.ui.customer.QrisActivity.open(OrderDetailActivity.this, order.id);
+                }
+            });
+        }
+        if (isMerchant() && order.awaitingPayment()) {
+            TextView w = Ui.text(this, "⏳ Menunggu pelanggan membayar QRIS", 14, Ui.ACCENT, true);
+            w.setGravity(Gravity.CENTER);
+            a.addView(w, Ui.matchWrap());
+        }
 
         if (isCustomer()) {
             if (s == Order.MENUNGGU) {
@@ -514,7 +528,7 @@ public class OrderDetailActivity extends BaseActivity {
             }
         }
 
-        if (isMerchant()) {
+        if (isMerchant() && !order.awaitingPayment()) {
             if (s == Order.MENUNGGU) {
                 btn(a, "✅ Terima Pesanan", Ui.PRIMARY, true).setOnClickListener(new View.OnClickListener() {
                     @Override

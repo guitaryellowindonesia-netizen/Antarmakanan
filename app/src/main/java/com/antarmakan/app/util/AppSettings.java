@@ -27,6 +27,8 @@ public final class AppSettings {
     public static volatile double RADIUS_DRIVER_KM = 10;
     /** Jarak antar maksimal semua resto (km); resto bisa memasang batas lebih kecil */
     public static volatile double JARAK_ANTAR_MAKS_KM = 25;
+    /** Pembayaran QRIS (Midtrans) aktif? Nyalakan setelah server terpasang. */
+    public static volatile boolean QRIS_AKTIF = false;
 
     public static synchronized void apply(JSONObject o) {
         if (o == null) return;
@@ -44,6 +46,7 @@ public final class AppSettings {
         BATAS_CARI_DRIVER_MENIT = o.optInt("batasDriverMenit", BATAS_CARI_DRIVER_MENIT);
         RADIUS_DRIVER_KM = o.optDouble("radiusDriverKm", RADIUS_DRIVER_KM);
         JARAK_ANTAR_MAKS_KM = o.optDouble("jarakAntarMaksKm", JARAK_ANTAR_MAKS_KM);
+        QRIS_AKTIF = o.optBoolean("qrisAktif", QRIS_AKTIF);
     }
 
     public static synchronized JSONObject toJson() {
@@ -63,6 +66,7 @@ public final class AppSettings {
             o.put("batasDriverMenit", BATAS_CARI_DRIVER_MENIT);
             o.put("radiusDriverKm", RADIUS_DRIVER_KM);
             o.put("jarakAntarMaksKm", JARAK_ANTAR_MAKS_KM);
+            o.put("qrisAktif", QRIS_AKTIF);
         } catch (Exception ignored) {
         }
         return o;

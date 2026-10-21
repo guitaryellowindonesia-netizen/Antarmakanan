@@ -53,6 +53,7 @@
         <activity android:name=".ui.common.NotificationsActivity" />
         <activity android:name=".ui.common.MapPickerActivity" />
         <activity android:name=".ui.common.ReportActivity" />
+        <activity android:name=".ui.customer.QrisActivity" />
         <activity android:name=".ui.common.ComplaintsActivity" />
         <activity android:name=".ui.customer.ComplaintFormActivity" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.admin.SettingsActivity" android:windowSoftInputMode="adjustResize" />

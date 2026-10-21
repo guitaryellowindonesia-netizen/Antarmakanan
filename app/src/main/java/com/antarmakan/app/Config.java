@@ -41,6 +41,10 @@ public final class Config {
     public static final String GOOGLE_WEB_CLIENT_ID =
             "974664465693-q8p5oasopvl6f25uvmetf2nj1dbsbjho.apps.googleusercontent.com";
 
+    /** Alamat server Cloud Functions (pembayaran QRIS). */
+    public static final String FUNCTIONS_URL =
+            "https://asia-southeast1-antarmakan-dharmasraya.cloudfunctions.net";
+
     public static boolean googleLoginEnabled() {
         return isOnline() && GOOGLE_WEB_CLIENT_ID.length() > 0;
     }

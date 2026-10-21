@@ -1018,8 +1018,11 @@ public class Repo {
             }
         }
         cart.clear();
-        notify(o.restoOwnerId, "🔔 Pesanan baru " + o.code,
-                o.customerName + " • " + o.itemCount() + " item • " + Fmt.rp(o.subtotal), o.id);
+        // pesanan QRIS baru diteruskan ke resto oleh server setelah lunas
+        if (!Order.BAYAR_QRIS.equals(payment)) {
+            notify(o.restoOwnerId, "🔔 Pesanan baru " + o.code,
+                    o.customerName + " • " + o.itemCount() + " item • " + Fmt.rp(o.subtotal), o.id);
+        }
         return o;
     }
 
@@ -1073,8 +1076,12 @@ public class Repo {
 
     /** Pesanan menunggu resto terlalu lama? */
     public static boolean isStale(Order o) {
-        return o.status == Order.MENUNGGU
-                && System.currentTimeMillis() - o.createdAt > com.antarmakan.app.util.AppSettings.BATAS_RESPON_RESTO_MENIT * 60000L;
+        if (o.status != Order.MENUNGGU) return false;
+        long now = System.currentTimeMillis();
+        // QRIS belum dibayar: batal bila lewat masa berlaku QR (+ cadangan)
+        if (o.awaitingPayment()) return now - o.createdAt > 30 * 60000L;
+        long start = o.paidAt > 0 ? o.paidAt : o.createdAt;
+        return now - start > com.antarmakan.app.util.AppSettings.BATAS_RESPON_RESTO_MENIT * 60000L;
     }
 
     /** Pelanggan boleh membatalkan karena tidak ada driver? */
@@ -1346,7 +1353,7 @@ public class Repo {
 
     private void afterCancel(Order o) throws Exception {
         clearTracking(o.id);
-        if (Order.BAYAR_SALDO.equals(o.paymentMethod)
+        if (o.isPrepaid()
                 && s.get(WALLET + "/" + o.customerId, "pay_" + o.id) != null) {
             ledger(o.customerId, "refund_" + o.id, o.total, "Pengembalian dana " + o.code, o.id);
         }
@@ -1435,7 +1442,7 @@ public class Repo {
         if (o.selfDelivery) {
             // diantar sendiri: ongkir 100% untuk penjual
             if (o.restoOwnerId.length() == 0) return;
-            if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
+            if (o.isPrepaid()) {
                 ledger(o.restoOwnerId, "settle_" + o.id, o.subtotal - komisiResto + o.deliveryFee,
                         "Penjualan + ongkir " + o.code + " (potong komisi " + com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_RESTO + "%)", o.id);
             } else {
@@ -1444,7 +1451,7 @@ public class Repo {
             }
             return;
         }
-        if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
+        if (o.isPrepaid()) {
             ledger(o.restoOwnerId, "settle_" + o.id, o.subtotal - komisiResto,
                     "Penjualan " + o.code + " (potong komisi " + com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_RESTO + "%)", o.id);
             ledger(o.driverId, "fee_" + o.id, o.deliveryFee - komisiDriver, "Ongkir " + o.code, o.id);
@@ -1550,6 +1557,35 @@ public class Repo {
 
     public void deleteImage(String id) throws Exception {
         if (id != null && id.length() > 0) s.delete(IMAGES, id);
+    }
+
+    // =====================================================================
+    //  QRIS (Midtrans, lewat server Cloud Functions)
+    // =====================================================================
+
+    /** Panggil fungsi server (Firebase callable) dengan token login. */
+    private JSONObject callFunction(String name, JSONObject data) throws Exception {
+        java.util.Map<String, String> h = new java.util.HashMap<String, String>();
+        h.put("Authorization", "Bearer " + auth.idToken());
+        JSONObject body = new JSONObject().put("data", data);
+        Http.Response r = Http.request("POST", Config.FUNCTIONS_URL + "/" + name, body.toString(), h);
+        JSONObject o = new JSONObject(r.body.length() == 0 ? "{}" : r.body);
+        if (o.has("error")) {
+            JSONObject e = o.optJSONObject("error");
+            throw new AppException(e != null ? e.optString("message", "Server error") : "Server error");
+        }
+        if (r.code >= 400) throw new AppException("Server pembayaran belum siap (" + r.code + ")");
+        return o.optJSONObject("result") != null ? o.optJSONObject("result") : new JSONObject();
+    }
+
+    /** Buat / ambil QRIS untuk pesanan: {qrString, expiresAt, amount} atau {paid:true}. */
+    public JSONObject createQris(String orderId) throws Exception {
+        return callFunction("createQrisPayment", new JSONObject().put("orderId", orderId));
+    }
+
+    /** Cek langsung ke Midtrans apakah sudah dibayar. */
+    public boolean checkQris(String orderId) throws Exception {
+        return callFunction("checkQrisPayment", new JSONObject().put("orderId", orderId)).optBoolean("paid");
     }
 
     // =====================================================================

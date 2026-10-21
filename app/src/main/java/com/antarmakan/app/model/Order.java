@@ -18,6 +18,7 @@ public class Order {
 
     public static final String BAYAR_TUNAI = "TUNAI";
     public static final String BAYAR_SALDO = "SALDO";
+    public static final String BAYAR_QRIS = "QRIS";
 
     public String id = "";
     public String code = "";
@@ -43,6 +44,8 @@ public class Order {
     public boolean rated;
     public boolean settled;
     public boolean selfDelivery;   // diantar sendiri oleh penjual
+    public boolean paid;           // QRIS: sudah lunas (ditandai server)
+    public long paidAt;
     public double custLat, custLng;     // titik antar (GPS pelanggan)
     public double restoLat, restoLng;   // titik resto
 
@@ -63,6 +66,22 @@ public class Order {
 
     public boolean isActive() {
         return status != SELESAI && status != DIBATALKAN;
+    }
+
+    /** Dibayar di muka (saldo / QRIS): bagi hasil lewat saldo. */
+    public boolean isPrepaid() {
+        return BAYAR_SALDO.equals(paymentMethod) || BAYAR_QRIS.equals(paymentMethod);
+    }
+
+    /** QRIS yang belum dibayar: resto belum boleh memproses. */
+    public boolean awaitingPayment() {
+        return BAYAR_QRIS.equals(paymentMethod) && !paid && status == MENUNGGU;
+    }
+
+    public String paymentLabel() {
+        if (BAYAR_SALDO.equals(paymentMethod)) return "Saldo (lunas)";
+        if (BAYAR_QRIS.equals(paymentMethod)) return paid ? "QRIS (lunas)" : "QRIS (belum dibayar)";
+        return "Tunai ke pengantar";
     }
 
     public boolean hasDriver() {
@@ -127,6 +146,8 @@ public class Order {
         o.put("rated", rated);
         o.put("settled", settled);
         o.put("selfDelivery", selfDelivery);
+        o.put("paid", paid);
+        o.put("paidAt", paidAt);
         o.put("custLat", custLat);
         o.put("custLng", custLng);
         o.put("restoLat", restoLat);
@@ -174,6 +195,8 @@ public class Order {
         r.rated = o.optBoolean("rated");
         r.settled = o.optBoolean("settled");
         r.selfDelivery = o.optBoolean("selfDelivery");
+        r.paid = o.optBoolean("paid");
+        r.paidAt = o.optLong("paidAt");
         r.custLat = o.optDouble("custLat", 0);
         r.custLng = o.optDouble("custLng", 0);
         r.restoLat = o.optDouble("restoLat", 0);

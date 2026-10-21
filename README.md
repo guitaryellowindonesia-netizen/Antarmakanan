@@ -177,6 +177,36 @@ Tampilan dibuat lewat kode Java (`util/Ui.java`) sehingga hampir tidak ada file 
 
 ---
 
+## 📱 Pembayaran QRIS (Midtrans)
+Pelanggan memilih **QRIS** → aplikasi menampilkan QR bernominal pas (berlaku 15 menit) → dibayar dengan
+e-wallet / m-banking apa pun → Midtrans mengabari server → pesanan otomatis **lunas** dan diteruskan ke resto.
+Bagi hasil resto & driver sama seperti bayar saldo. Jika pesanan batal, dana masuk ke saldo pelanggan.
+
+**Langkah memasang:**
+1. **Daftar Midtrans** (https://dashboard.midtrans.com, kategori *Individu*, KTP). Di mode **Sandbox**, buka
+   *Settings → Access Keys*, salin **Server Key** (`SB-Mid-server-...`).
+2. **Firebase → paket Blaze** (wajib untuk server) + pasang *Budget alert* (mis. Rp50.000).
+3. **Pasang server** lewat **Google Cloud Shell** (browser, tanpa komputer khusus):
+   buka https://shell.cloud.google.com (login akun Google pemilik Firebase), lalu jalankan:
+   ```
+   git clone https://github.com/guitaryellowindonesia-netizen/Antarmakanan.git
+   cd Antarmakanan && bash deploy-server.sh
+   ```
+   Ikuti petunjuknya (login, tempel Server Key). Skrip ini juga memasang **Rules** terbaru.
+4. Di **Midtrans Dashboard → Settings → Configuration → Payment Notification URL** isi:
+   `https://asia-southeast1-antarmakan-dharmasraya.cloudfunctions.net/midtransWebhook`
+5. Di aplikasi: **Admin → Lainnya → ⚙️ Pengaturan → centang "Aktifkan pembayaran QRIS"**.
+6. Uji coba (Sandbox): buat pesanan QRIS, lalu bayar dengan *QRIS Simulator* Midtrans
+   (https://simulator.sandbox.midtrans.com/v2/qris/index) menggunakan isi/gambar QR.
+7. **Go-live**: aktifkan akun Production di Midtrans, ganti `functions/.env` menjadi
+   `MIDTRANS_PRODUCTION=true`, jalankan lagi `bash deploy-server.sh` dan isi Server Key **Production**
+   (`npx -y firebase-tools@13 functions:secrets:set MIDTRANS_SERVER_KEY`), lalu ganti URL notifikasi
+   di dashboard Production.
+
+> Server Key **jangan** dikirim lewat chat atau disimpan di aplikasi/GitHub publik.
+> Alternatif otomatis: isi GitHub Secret `FIREBASE_SERVICE_ACCOUNT` (& `MIDTRANS_SERVER_KEY`) agar
+> workflow *Deploy Server Firebase* memasang server setiap ada perubahan.
+
 ## 🔒 Keamanan (Rules Firebase)
 `database.rules.json` memeriksa setiap perubahan di server, sehingga dari HP **tidak bisa**:
 - menambah saldo sendiri / mencatat transaksi palsu (saldo = buku besar `wallet/{uid}` yang divalidasi per pesanan)

@@ -21,6 +21,7 @@ public class SettingsActivity extends BaseFormActivity {
 
     private EditText dasar, jarakDasar, perKm, maks, layanan, kResto, kDriver, minTopup, info, cs,
             batasResto, batasDriver, radius, jarakMaks;
+    private android.widget.CheckBox qris;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,6 +76,10 @@ public class SettingsActivity extends BaseFormActivity {
         radius = field(c3, "Driver hanya melihat order dari resto dalam radius (km)",
                 num(AppSettings.RADIUS_DRIVER_KM), Ui.number(this, "10"));
         cs = field(c3, "Nomor WhatsApp CS (format 62...)", AppSettings.CS_PHONE, Ui.phone(this, "628..."));
+        qris = new android.widget.CheckBox(this);
+        qris.setText("📱 Aktifkan pembayaran QRIS (Midtrans) — nyalakan setelah server terpasang");
+        qris.setChecked(AppSettings.QRIS_AKTIF);
+        c3.addView(qris);
 
         Button save = Ui.primary(this, "Simpan Pengaturan");
         save.setOnClickListener(new View.OnClickListener() {
@@ -113,6 +118,7 @@ public class SettingsActivity extends BaseFormActivity {
             o.put("batasDriverMenit", (int) dbl(batasDriver));
             o.put("radiusDriverKm", dbl(radius));
             o.put("csPhone", Fmt.waNumber(cs.getText().toString()));
+            o.put("qrisAktif", qris.isChecked());
         } catch (Exception e) {
             Ui.toast(this, "Isian tidak valid");
             return;

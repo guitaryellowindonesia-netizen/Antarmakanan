@@ -113,6 +113,7 @@ public class MerchantMainActivity extends TabbedActivity {
                 LinearLayout history = Ui.vbox(MerchantMainActivity.this);
                 int hist = 0;
                 for (Order o : d.orders) {
+                    if (o.awaitingPayment()) continue; // QRIS belum dibayar
                     if (o.status == Order.MENUNGGU) {
                         fresh.addView(Views.orderCard(MerchantMainActivity.this, o, User.ROLE_MERCHANT));
                         pending++;
