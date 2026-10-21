@@ -5,6 +5,7 @@ import android.content.Context;
 import com.antarmakan.app.Config;
 import com.antarmakan.app.model.AppNotif;
 import com.antarmakan.app.model.CartItem;
+import com.antarmakan.app.model.Complaint;
 import com.antarmakan.app.model.MenuItem;
 import com.antarmakan.app.model.Message;
 import com.antarmakan.app.model.Order;
@@ -16,6 +17,7 @@ import com.antarmakan.app.model.TopUp;
 import com.antarmakan.app.model.User;
 import com.antarmakan.app.model.WalletTx;
 import com.antarmakan.app.util.Cart;
+import com.antarmakan.app.util.AppSettings;
 import com.antarmakan.app.util.Fmt;
 import com.antarmakan.app.util.Geo;
 import com.antarmakan.app.util.Session;
@@ -59,6 +61,50 @@ public class Repo {
         this.ctx = ctx;
         this.s = store;
         this.auth = auth;
+        try {
+            String cached = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("app", null);
+            if (cached != null) AppSettings.apply(new JSONObject(cached));
+        } catch (Exception ignored) {
+        }
+    }
+
+    // =====================================================================
+    //  PENGATURAN (diubah admin dari aplikasi)
+    // =====================================================================
+
+    public static final String SETTINGS = "settings";
+    private long settingsLoadedAt = 0;
+
+    /** Muat pengaturan dari server (paling sering tiap 5 menit). */
+    public void refreshSettings(boolean force) {
+        if (!force && System.currentTimeMillis() - settingsLoadedAt < 5 * 60000L) return;
+        try {
+            JSONObject o = s.get(SETTINGS, "app");
+            settingsLoadedAt = System.currentTimeMillis();
+            if (o != null) {
+                AppSettings.apply(o);
+                ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+                        .putString("app", o.toString()).apply();
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void saveSettings(JSONObject o) throws Exception {
+        if (o.optInt("komisiResto") < 0 || o.optInt("komisiResto") > 50
+                || o.optInt("komisiDriver") < 0 || o.optInt("komisiDriver") > 50) {
+            throw new AppException("Komisi harus 0 - 50%");
+        }
+        if (o.optInt("ongkirDasar") < 0 || o.optInt("ongkirMaks") < o.optInt("ongkirDasar")) {
+            throw new AppException("Periksa tarif ongkir (maksimal harus >= dasar)");
+        }
+        if (o.optInt("batasRestoMenit") < 3 || o.optInt("batasDriverMenit") < 5) {
+            throw new AppException("Batas waktu terlalu kecil");
+        }
+        s.put(SETTINGS, "app", o);
+        AppSettings.apply(o);
+        settingsLoadedAt = System.currentTimeMillis();
+        ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).edit().putString("app", o.toString()).apply();
     }
 
     private static long now() {
@@ -370,6 +416,7 @@ public class Repo {
 
     /** Data pengguna yang sedang login (selalu terbaru dari server). */
     public User me() throws Exception {
+        refreshSettings(false);
         String id = Session.userId(ctx);
         if (id.length() == 0) throw new AppException("Silakan masuk dulu");
         JSONObject o = s.get(USERS, id);
@@ -514,8 +561,8 @@ public class Repo {
     }
 
     public void requestTopUp(User u, long amount, String info) throws Exception {
-        if (amount < Config.MIN_TOPUP) {
-            throw new AppException("Minimal top up " + com.antarmakan.app.util.Fmt.rp(Config.MIN_TOPUP));
+        if (amount < com.antarmakan.app.util.AppSettings.MIN_TOPUP) {
+            throw new AppException("Minimal top up " + com.antarmakan.app.util.Fmt.rp(com.antarmakan.app.util.AppSettings.MIN_TOPUP));
         }
         TopUp t = new TopUp();
         t.id = Ids.newId();
@@ -531,8 +578,8 @@ public class Repo {
 
     /** Penarikan saldo: saldo langsung ditahan, dikembalikan jika ditolak. */
     public void requestWithdraw(User u, long amount, String info) throws Exception {
-        if (amount < Config.MIN_TOPUP) {
-            throw new AppException("Minimal penarikan " + com.antarmakan.app.util.Fmt.rp(Config.MIN_TOPUP));
+        if (amount < com.antarmakan.app.util.AppSettings.MIN_TOPUP) {
+            throw new AppException("Minimal penarikan " + com.antarmakan.app.util.Fmt.rp(com.antarmakan.app.util.AppSettings.MIN_TOPUP));
         }
         if (info.trim().length() < 5) throw new AppException("Isi nomor rekening / e-wallet tujuan");
         TopUp t = new TopUp();
@@ -595,6 +642,7 @@ public class Repo {
     /** Daftar resto, jarak & ongkir dihitung dari titik GPS pengguna (jika ada). */
     public List<Restaurant> restaurants(String userKec, double lat, double lng, boolean includeInactive)
             throws Exception {
+        refreshSettings(false);
         List<Restaurant> out = new ArrayList<Restaurant>();
         for (JSONObject o : s.list(RESTOS)) {
             Restaurant r = Restaurant.fromJson(o);
@@ -606,7 +654,7 @@ public class Repo {
         Collections.sort(out, new Comparator<Restaurant>() {
             @Override
             public int compare(Restaurant a, Restaurant b) {
-                boolean oa = a.isOpenNow(), ob = b.isOpenNow();
+                boolean oa = a.isOpenNow() && a.inRange(), ob = b.isOpenNow() && b.inRange();
                 if (oa != ob) return oa ? -1 : 1;
                 return Double.compare(a.distanceKm, b.distanceKm);
             }
@@ -647,6 +695,11 @@ public class Repo {
                     n.put("ratingSum", cur.optDouble("ratingSum", 0));
                     n.put("ratingCount", cur.optInt("ratingCount"));
                     n.put("createdAt", cur.optLong("createdAt"));
+                    if (!User.ROLE_ADMIN.equals(Session.role(ctx))) {
+                        // hanya admin yang boleh mengubah status aktif & pemilik
+                        n.put("active", cur.optBoolean("active"));
+                        n.put("ownerId", cur.optString("ownerId"));
+                    }
                 }
                 return n;
             }
@@ -838,7 +891,7 @@ public class Repo {
         q.subtotal = subtotal;
         q.distanceKm = Geo.distanceKm(kecamatan, lat, lng, r.kecamatan, r.lat, r.lng);
         q.deliveryFee = Geo.deliveryFee(q.distanceKm);
-        q.serviceFee = Config.BIAYA_LAYANAN;
+        q.serviceFee = com.antarmakan.app.util.AppSettings.BIAYA_LAYANAN;
         if (promoCode != null && promoCode.trim().length() > 0) {
             Promo p = findPromo(promoCode);
             if (p == null || !p.active) {
@@ -874,17 +927,23 @@ public class Repo {
         for (CartItem ci : cart.getItems()) {
             MenuItem m = latest.get(ci.menuId);
             if (m == null || !m.available) throw new AppException(ci.name + " sedang tidak tersedia");
+            long unit = m.price + com.antarmakan.app.model.MenuOption.extraPrice(m.options, ci.options);
             OrderItem it = new OrderItem();
             it.menuId = m.id;
             it.name = m.name;
-            it.price = m.price;
+            it.price = unit;
             it.qty = ci.qty;
             it.note = ci.note;
+            it.options = ci.options;
             o.items.add(it);
-            subtotal += m.price * ci.qty;
+            subtotal += unit * ci.qty;
         }
 
         Quote q = quote(r, subtotal, kecamatan, lat, lng, promoCode);
+        if (q.distanceKm > r.effectiveMaxKm()) {
+            throw new AppException("Lokasi di luar jangkauan antar resto ini (maks "
+                    + Fmt.km(r.effectiveMaxKm()) + ")");
+        }
         if (promoCode != null && promoCode.trim().length() > 0 && q.promo == null) {
             throw new AppException(q.promoMessage);
         }
@@ -964,6 +1023,45 @@ public class Repo {
         return o;
     }
 
+    /**
+     * Isi ulang keranjang dari pesanan lama ("Pesan lagi") memakai harga terbaru.
+     * Mengembalikan jumlah menu yang tidak bisa dipesan lagi.
+     */
+    public int reorder(Order old, Cart cart) throws Exception {
+        Restaurant r = resto(old.restoId, old.kecamatan);
+        if (!r.active) throw new AppException("Resto sudah tidak aktif");
+        Map<String, MenuItem> latest = new HashMap<String, MenuItem>();
+        for (MenuItem m : menus(old.restoId)) latest.put(m.id, m);
+        int skipped = 0;
+        boolean first = true;
+        for (OrderItem it : old.items) {
+            MenuItem m = latest.get(it.menuId);
+            long extra;
+            try {
+                if (m == null || !m.available) throw new AppException("habis");
+                extra = com.antarmakan.app.model.MenuOption.extraPrice(m.options, it.options);
+            } catch (AppException e) {
+                skipped++;
+                continue;
+            }
+            if (first) {
+                cart.clear();
+                first = false;
+            }
+            CartItem ci = new CartItem();
+            ci.menuId = m.id;
+            ci.name = m.name;
+            ci.emoji = m.emoji;
+            ci.price = m.price + extra;
+            ci.qty = it.qty;
+            ci.note = it.note;
+            ci.options = it.options;
+            cart.addLine(r.id, r.name, ci);
+        }
+        if (first) throw new AppException("Semua menu di pesanan ini sedang tidak tersedia");
+        return skipped;
+    }
+
     public Order order(String id) throws Exception {
         JSONObject o = s.get(ORDERS, id);
         if (o == null) throw new AppException("Pesanan tidak ditemukan");
@@ -976,13 +1074,13 @@ public class Repo {
     /** Pesanan menunggu resto terlalu lama? */
     public static boolean isStale(Order o) {
         return o.status == Order.MENUNGGU
-                && System.currentTimeMillis() - o.createdAt > Config.BATAS_RESPON_RESTO_MENIT * 60000L;
+                && System.currentTimeMillis() - o.createdAt > com.antarmakan.app.util.AppSettings.BATAS_RESPON_RESTO_MENIT * 60000L;
     }
 
     /** Pelanggan boleh membatalkan karena tidak ada driver? */
     public static boolean canCancelNoDriver(Order o) {
         return (o.status == Order.DIMASAK || o.status == Order.SIAP) && !o.hasDriver() && !o.selfDelivery
-                && System.currentTimeMillis() - o.updatedAt > Config.BATAS_CARI_DRIVER_MENIT * 60000L;
+                && System.currentTimeMillis() - o.updatedAt > com.antarmakan.app.util.AppSettings.BATAS_CARI_DRIVER_MENIT * 60000L;
     }
 
     /**
@@ -1002,14 +1100,14 @@ public class Repo {
                         if (x.status != Order.MENUNGGU) throw new AppException("sudah diproses");
                         x.status = Order.DIBATALKAN;
                         x.cancelReason = "Otomatis dibatalkan: resto tidak merespons "
-                                + Config.BATAS_RESPON_RESTO_MENIT + " menit";
+                                + com.antarmakan.app.util.AppSettings.BATAS_RESPON_RESTO_MENIT + " menit";
                     }
                 });
                 afterCancel(c);
                 notify(c.customerId, "❌ Pesanan " + c.code + " dibatalkan",
                         "Resto tidak merespons. Dana dikembalikan bila bayar saldo.", c.id);
                 notify(c.restoOwnerId, "Pesanan " + c.code + " dibatalkan otomatis",
-                        "Tidak direspons dalam " + Config.BATAS_RESPON_RESTO_MENIT + " menit", c.id);
+                        "Tidak direspons dalam " + com.antarmakan.app.util.AppSettings.BATAS_RESPON_RESTO_MENIT + " menit", c.id);
                 list.set(i, c);
             } catch (Exception ignored) {
             }
@@ -1047,11 +1145,42 @@ public class Repo {
 
     /** Pesanan yang bisa diambil driver: sudah diterima resto & belum ada driver. */
     public List<Order> availableJobs() throws Exception {
+        return availableJobs(0, 0);
+    }
+
+    /** Order yang bisa diambil driver di sekitar posisinya (radius dari pengaturan). */
+    public List<Order> availableJobs(double lat, double lng) throws Exception {
+        refreshSettings(false);
         List<Order> out = new ArrayList<Order>();
         for (Order o : toOrders(s.query(ORDERS, "driverId", ""))) {
-            if (!o.selfDelivery && (o.status == Order.DIMASAK || o.status == Order.SIAP)) out.add(o);
+            if (o.selfDelivery || (o.status != Order.DIMASAK && o.status != Order.SIAP)) continue;
+            if (Geo.has(lat, lng) && distanceToResto(o, lat, lng) > AppSettings.RADIUS_DRIVER_KM) continue;
+            out.add(o);
         }
         return out;
+    }
+
+    private static double distanceToResto(Order o, double lat, double lng) {
+        if (Geo.has(o.restoLat, o.restoLng)) return Geo.distanceKm(lat, lng, o.restoLat, o.restoLng);
+        return Geo.distanceKm(lat, lng, Geo.lat(o.restoKecamatan), Geo.lng(o.restoKecamatan));
+    }
+
+    private long lastLocSave = 0;
+
+    /** Simpan posisi terakhir driver (paling sering tiap 2 menit) untuk pembagian order. */
+    public void updateMyLocation(final double lat, final double lng) {
+        if (!Geo.has(lat, lng) || System.currentTimeMillis() - lastLocSave < 120000) return;
+        lastLocSave = System.currentTimeMillis();
+        try {
+            editUser(Session.userId(ctx), new UserEdit() {
+                @Override
+                public void edit(JSONObject o) throws Exception {
+                    o.put("lat", lat);
+                    o.put("lng", lng);
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     public List<Order> allOrders() throws Exception {
@@ -1301,14 +1430,14 @@ public class Repo {
      *         lalu komisi aplikasi dipotong dari saldo resto & driver.
      */
     private void settle(Order o) throws Exception {
-        long komisiResto = o.subtotal * Config.KOMISI_PERSEN_RESTO / 100;
-        long komisiDriver = o.deliveryFee * Config.KOMISI_PERSEN_DRIVER / 100;
+        long komisiResto = o.subtotal * com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_RESTO / 100;
+        long komisiDriver = o.deliveryFee * com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_DRIVER / 100;
         if (o.selfDelivery) {
             // diantar sendiri: ongkir 100% untuk penjual
             if (o.restoOwnerId.length() == 0) return;
             if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
                 ledger(o.restoOwnerId, "settle_" + o.id, o.subtotal - komisiResto + o.deliveryFee,
-                        "Penjualan + ongkir " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", o.id);
+                        "Penjualan + ongkir " + o.code + " (potong komisi " + com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_RESTO + "%)", o.id);
             } else {
                 ledger(o.restoOwnerId, "settle_" + o.id, o.discount - komisiResto - o.serviceFee,
                         "Komisi & biaya layanan " + o.code + " (tunai)", o.id);
@@ -1317,7 +1446,7 @@ public class Repo {
         }
         if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
             ledger(o.restoOwnerId, "settle_" + o.id, o.subtotal - komisiResto,
-                    "Penjualan " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", o.id);
+                    "Penjualan " + o.code + " (potong komisi " + com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_RESTO + "%)", o.id);
             ledger(o.driverId, "fee_" + o.id, o.deliveryFee - komisiDriver, "Ongkir " + o.code, o.id);
         } else {
             ledger(o.restoOwnerId, "settle_" + o.id, -komisiResto, "Komisi aplikasi " + o.code, o.id);
@@ -1424,6 +1553,87 @@ public class Repo {
     }
 
     // =====================================================================
+    //  KOMPLAIN
+    // =====================================================================
+
+    public static final String COMPLAINTS = "complaints";
+
+    public Complaint complaintOf(String orderId) throws Exception {
+        JSONObject o = s.get(COMPLAINTS, orderId);
+        return o == null ? null : Complaint.fromJson(o);
+    }
+
+    /** Pelanggan melaporkan masalah pesanan (satu laporan per pesanan). */
+    public void createComplaint(Order o, String category, String text, String imageId) throws Exception {
+        if (text.trim().length() < 5) throw new AppException("Ceritakan masalahnya (minimal 5 huruf)");
+        if (complaintOf(o.id) != null) throw new AppException("Pesanan ini sudah dilaporkan");
+        Complaint c = new Complaint();
+        c.id = o.id;
+        c.orderId = o.id;
+        c.orderCode = o.code;
+        c.customerId = o.customerId;
+        c.customerName = o.customerName;
+        c.customerPhone = o.customerPhone;
+        c.restoName = o.restoName;
+        c.restoOwnerId = o.restoOwnerId;
+        c.driverId = o.driverId;
+        c.category = category;
+        c.text = text.trim();
+        c.imageId = imageId == null ? "" : imageId;
+        c.orderTotal = o.total;
+        c.createdAt = now();
+        s.put(COMPLAINTS, c.id, c.toJson());
+        try {
+            for (JSONObject u : s.query(USERS, "role", User.ROLE_ADMIN)) {
+                notify(u.optString("id"), "⚠️ Komplain baru " + o.code, category + ": " + c.text, o.id);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    public List<Complaint> complaints(String customerIdOrNull) throws Exception {
+        List<JSONObject> raw = customerIdOrNull == null ? s.list(COMPLAINTS)
+                : s.query(COMPLAINTS, "customerId", customerIdOrNull);
+        List<Complaint> out = new ArrayList<Complaint>();
+        for (JSONObject o : raw) out.add(Complaint.fromJson(o));
+        Collections.sort(out, new Comparator<Complaint>() {
+            @Override
+            public int compare(Complaint a, Complaint b) {
+                boolean oa = Complaint.OPEN.equals(a.status), ob = Complaint.OPEN.equals(b.status);
+                if (oa != ob) return oa ? -1 : 1;
+                return Long.compare(b.createdAt, a.createdAt);
+            }
+        });
+        return out;
+    }
+
+    /** Admin menyelesaikan komplain, opsional dengan pengembalian dana ke saldo pelanggan. */
+    public void resolveComplaint(final String id, final boolean accept, final long refund, final String note)
+            throws Exception {
+        JSONObject res = s.transact(COMPLAINTS, id, new Store.Updater() {
+            @Override
+            public JSONObject update(JSONObject cur) throws Exception {
+                if (cur == null) throw new AppException("Komplain tidak ditemukan");
+                if (!Complaint.OPEN.equals(cur.optString("status"))) throw new AppException("Sudah diproses");
+                if (refund < 0 || refund > cur.optLong("orderTotal")) {
+                    throw new AppException("Pengembalian maksimal " + Fmt.rp(cur.optLong("orderTotal")));
+                }
+                cur.put("status", accept ? Complaint.RESOLVED : Complaint.REJECTED);
+                cur.put("refund", accept ? refund : 0);
+                cur.put("adminNote", note.trim());
+                return cur;
+            }
+        });
+        Complaint c = Complaint.fromJson(res);
+        if (accept && refund > 0) {
+            ledger(c.customerId, "complaint_" + c.orderId, refund, "Pengembalian komplain " + c.orderCode, c.orderId);
+        }
+        notify(c.customerId, accept ? "✅ Komplain " + c.orderCode + " diselesaikan" : "Komplain " + c.orderCode + " ditolak",
+                (accept && refund > 0 ? "Dana " + Fmt.rp(refund) + " dikembalikan ke saldo. " : "") + note, c.orderId);
+        notify(c.restoOwnerId, "Komplain pesanan " + c.orderCode, c.category + (accept ? " (diterima admin)" : " (ditolak)"), c.orderId);
+    }
+
+    // =====================================================================
     //  CHAT
     // =====================================================================
 
@@ -1525,6 +1735,8 @@ public class Repo {
         try {
             for (JSONObject u : s.query(USERS, "role", User.ROLE_DRIVER)) {
                 if (u.optBoolean("online") && u.optBoolean("active", true)) {
+                    double dl = u.optDouble("lat", 0), dg = u.optDouble("lng", 0);
+                    if (Geo.has(dl, dg) && distanceToResto(o, dl, dg) > AppSettings.RADIUS_DRIVER_KM) continue;
                     notify(u.optString("id"), "📦 Order baru tersedia",
                             o.restoName + " → Kec. " + o.kecamatan + " • ongkir " + Fmt.rp(o.deliveryFee), o.id);
                 }

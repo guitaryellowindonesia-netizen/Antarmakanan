@@ -9,6 +9,7 @@ public class OrderItem {
     public long price;
     public int qty;
     public String note = "";
+    public String options = "";   // pilihan varian "Grup=Pilihan;..."
 
     public JSONObject toJson() throws JSONException {
         JSONObject o = new JSONObject();
@@ -17,6 +18,7 @@ public class OrderItem {
         o.put("price", price);
         o.put("qty", qty);
         o.put("note", note);
+        o.put("options", options);
         return o;
     }
 
@@ -27,6 +29,7 @@ public class OrderItem {
         i.price = o.optLong("price");
         i.qty = o.optInt("qty");
         i.note = o.optString("note");
+        i.options = o.optString("options");
         return i;
     }
 }

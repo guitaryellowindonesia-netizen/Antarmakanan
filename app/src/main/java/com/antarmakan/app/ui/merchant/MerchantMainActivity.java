@@ -263,7 +263,8 @@ public class MerchantMainActivity extends TabbedActivity {
                 LinearLayout info = Ui.vbox(MerchantMainActivity.this);
                 info.addView(Ui.title(MerchantMainActivity.this, r.isOpen ? "Toko BUKA" : "Toko TUTUP"));
                 info.addView(Ui.muted(MerchantMainActivity.this,
-                        r.isOpen && !r.isOpenNow() ? "Di luar jam buka, pelanggan melihat toko tutup"
+                        r.isOpen && r.isHolidayToday() ? "Hari ini jadwal LIBUR, pelanggan melihat toko libur"
+                        : r.isOpen && !r.isOpenNow() ? "Di luar jam buka, pelanggan melihat toko tutup"
                                 : "Matikan jika ingin tutup sementara"));
                 row.addView(info, Ui.weight(1));
                 Switch s = new Switch(MerchantMainActivity.this);

@@ -218,6 +218,9 @@ public class CartActivity extends BaseActivity {
             LinearLayout info = Ui.vbox(this);
             info.setPadding(Ui.dp(this, 10), 0, 0, 0);
             info.addView(Ui.text(this, ci.name, 14, Ui.TEXT, true));
+            if (ci.options.length() > 0) {
+                info.addView(Ui.muted(this, com.antarmakan.app.model.MenuOption.describe(ci.options)));
+            }
             info.addView(Ui.text(this, Fmt.rp(ci.total()), 13, Ui.TEXT, false));
             TextView noteView = Ui.text(this, ci.note.length() > 0 ? "📝 " + ci.note : "📝 Tambah catatan",
                     12, ci.note.length() > 0 ? Ui.TEXT : Ui.PRIMARY, false);
@@ -228,7 +231,7 @@ public class CartActivity extends BaseActivity {
                             ci.note, InputType.TYPE_CLASS_TEXT, new Ui.TextCallback() {
                                 @Override
                                 public void onText(String text) {
-                                    cart.setNote(ci.menuId, text);
+                                    cart.setNote(ci.key(), text);
                                     renderItems();
                                 }
                             });
@@ -240,7 +243,7 @@ public class CartActivity extends BaseActivity {
             minus.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    cart.remove(ci.menuId);
+                    cart.remove(ci.key());
                     if (cart.isEmpty()) {
                         Ui.toast(CartActivity.this, "Keranjang kosong");
                         finish();
@@ -256,7 +259,7 @@ public class CartActivity extends BaseActivity {
             plus.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    cart.increase(ci.menuId);
+                    cart.increase(ci.key());
                     renderItems();
                     recalc();
                 }

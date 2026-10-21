@@ -42,6 +42,8 @@ public class CustomerMainActivity extends TabbedActivity {
     private Set<String> favs;
     private String query = "";
     private String category = "Semua";
+    private int sortMode = 0;          // 0 terdekat, 1 rating, 2 ongkir termurah
+    private boolean openOnly = false;
     private LinearLayout restoList;
 
     @Override
@@ -205,6 +207,30 @@ public class CustomerMainActivity extends TabbedActivity {
         page.addView(Ui.hscroll(this, cats));
 
         page.addView(Ui.section(this, "Resto di sekitarmu"));
+        LinearLayout sorts = Ui.hbox(this);
+        final String[] sortNames = {"📍 Terdekat", "⭐ Rating", "🛵 Ongkir murah"};
+        for (int i = 0; i < sortNames.length; i++) {
+            final int idx = i;
+            TextView chip = Ui.chip(this, sortNames[i], sortMode == i);
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    sortMode = idx;
+                    renderHome(lastHome);
+                }
+            });
+            sorts.addView(chip);
+        }
+        TextView openChip = Ui.chip(this, "🟢 Buka saja", openOnly);
+        openChip.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openOnly = !openOnly;
+                renderHome(lastHome);
+            }
+        });
+        sorts.addView(openChip);
+        page.addView(Ui.hscroll(this, sorts));
         restoList = Ui.vbox(this);
         page.addView(restoList);
         lastHome = d;
@@ -218,7 +244,19 @@ public class CustomerMainActivity extends TabbedActivity {
         if (restoList == null) return;
         restoList.removeAllViews();
         int n = 0;
-        for (Restaurant r : restos) {
+        List<Restaurant> sorted = new ArrayList<Restaurant>(restos);
+        java.util.Collections.sort(sorted, new java.util.Comparator<Restaurant>() {
+            @Override
+            public int compare(Restaurant a, Restaurant b) {
+                boolean oa = a.isOpenNow() && a.inRange(), ob = b.isOpenNow() && b.inRange();
+                if (oa != ob) return oa ? -1 : 1;
+                if (sortMode == 1) return Double.compare(b.rating(), a.rating());
+                if (sortMode == 2) return Integer.compare(a.deliveryFee, b.deliveryFee);
+                return Double.compare(a.distanceKm, b.distanceKm);
+            }
+        });
+        for (Restaurant r : sorted) {
+            if (openOnly && !(r.isOpenNow() && r.inRange())) continue;
             if (!"Semua".equals(category) && !category.equals(r.category)) continue;
             if (query.length() > 0) {
                 String hay = (r.name + " " + r.category + " " + r.kecamatan).toLowerCase(Locale.US)

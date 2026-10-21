@@ -57,7 +57,10 @@ public class DriverMainActivity extends TabbedActivity {
                 Data d = new Data();
                 d.me = repo.me();
                 d.mine = repo.ordersOfDriver(d.me.id);
-                if (d.me.online && d.me.active) d.jobs = repo.availableJobs();
+                android.location.Location l = com.antarmakan.app.util.Loc.lastKnown(DriverMainActivity.this);
+                double lat = l != null ? l.getLatitude() : d.me.lat, lng = l != null ? l.getLongitude() : d.me.lng;
+                if (d.me.online && l != null) repo.updateMyLocation(lat, lng);
+                if (d.me.online && d.me.active) d.jobs = repo.availableJobs(lat, lng);
                 return d;
             }
         }, new Async.Callback<Data>() {
@@ -122,7 +125,7 @@ public class DriverMainActivity extends TabbedActivity {
             if (o.isActive()) active = o;
             if (o.status == Order.SELESAI && o.createdAt >= start) {
                 count++;
-                earn += o.deliveryFee - o.deliveryFee * Config.KOMISI_PERSEN_DRIVER / 100;
+                earn += o.deliveryFee - o.deliveryFee * com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_DRIVER / 100;
             }
         }
         page.addView(Views.statRow(this,
@@ -136,6 +139,8 @@ public class DriverMainActivity extends TabbedActivity {
             page.addView(Views.orderCard(this, active, User.ROLE_DRIVER));
         } else if (d.me.online) {
             page.addView(Ui.section(this, "📦 Order tersedia (" + d.jobs.size() + ")"));
+            page.addView(Ui.muted(this, "      Resto dalam radius " + Fmt.km(com.antarmakan.app.util.AppSettings.RADIUS_DRIVER_KM)
+                    + " dari posisimu"));
             if (d.jobs.isEmpty()) {
                 page.addView(Ui.empty(this, "Belum ada order. Tunggu sebentar ya... ⏳"));
             }
@@ -168,7 +173,7 @@ public class DriverMainActivity extends TabbedActivity {
                 for (Order o : list) {
                     if (o.status == Order.SELESAI) {
                         done++;
-                        total += o.deliveryFee - o.deliveryFee * Config.KOMISI_PERSEN_DRIVER / 100;
+                        total += o.deliveryFee - o.deliveryFee * com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_DRIVER / 100;
                     }
                 }
                 page.addView(Views.header(DriverMainActivity.this, "Riwayat Order",

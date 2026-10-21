@@ -146,8 +146,12 @@ public class RestaurantActivity extends BaseActivity {
         info.addView(Ui.text(this, "🛵 Ongkir ke Kec. " + me.kecamatan + ": " + Fmt.rp(resto.deliveryFee),
                 13, Ui.PRIMARY_DARK, true));
         if (resto.selfDelivery) info.addView(Ui.muted(this, "Pesanan diantar langsung oleh penjual"));
-        if (!resto.isOpenNow()) {
-            TextView closed = Ui.text(this, "Resto sedang TUTUP. Kamu belum bisa memesan.", 13, Ui.RED, true);
+        if (!resto.isOpenNow() || !resto.inRange()) {
+            String why = resto.isHolidayToday() ? "Resto LIBUR hari ini. Kamu belum bisa memesan."
+                    : !resto.inRange() ? "Lokasimu di luar jangkauan antar resto ini (maks "
+                    + Fmt.km(resto.effectiveMaxKm()) + ")."
+                    : "Resto sedang TUTUP. Kamu belum bisa memesan.";
+            TextView closed = Ui.text(this, why, 13, Ui.RED, true);
             closed.setPadding(0, Ui.dp(this, 6), 0, 0);
             info.addView(closed);
         }
@@ -178,11 +182,12 @@ public class RestaurantActivity extends BaseActivity {
         info.addView(Ui.text(this, m.name, 15, Ui.TEXT, true));
         if (m.description.length() > 0) info.addView(Ui.muted(this, m.description));
         info.addView(Ui.text(this, Fmt.rp(m.price), 14, Ui.TEXT, true));
+        if (m.hasOptions()) info.addView(Ui.text(this, "Ada pilihan varian", 12, Ui.PRIMARY_DARK, false));
         row.addView(info, Ui.weight(1));
 
         final Cart cart = Cart.get(this);
         int qty = resto.id.equals(cart.getRestoId()) ? cart.qtyOf(m.id) : 0;
-        boolean canOrder = m.available && resto.isOpenNow();
+        boolean canOrder = m.available && resto.isOpenNow() && resto.inRange();
         if (!m.available) {
             row.addView(Ui.badge(this, "HABIS", Ui.MUTED));
             card.setAlpha(0.6f);
@@ -202,7 +207,7 @@ public class RestaurantActivity extends BaseActivity {
             minus.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    cart.remove(m.id);
+                    cart.removeOne(m.id);
                     render();
                 }
             });
@@ -226,7 +231,11 @@ public class RestaurantActivity extends BaseActivity {
 
     private void addToCart(final MenuItem m) {
         if (!resto.isOpenNow()) {
-            Ui.toast(this, "Resto sedang tutup");
+            Ui.toast(this, resto.isHolidayToday() ? "Resto libur hari ini" : "Resto sedang tutup");
+            return;
+        }
+        if (!resto.inRange()) {
+            Ui.toast(this, "Lokasimu di luar jangkauan antar resto ini");
             return;
         }
         final Cart cart = Cart.get(this);
@@ -238,14 +247,100 @@ public class RestaurantActivity extends BaseActivity {
                         @Override
                         public void run() {
                             cart.clear();
-                            cart.add(resto.id, resto.name, m);
-                            render();
+                            addWithOptions(m);
                         }
                     });
             return;
         }
-        cart.add(resto.id, resto.name, m);
-        render();
+        addWithOptions(m);
+    }
+
+    /** Tambah ke keranjang; menu bervarian menampilkan pilihan dulu. */
+    private void addWithOptions(final MenuItem m) {
+        if (!m.hasOptions()) {
+            Cart.get(this).add(resto.id, resto.name, m);
+            render();
+            return;
+        }
+        LinearLayout box = Ui.vbox(this);
+        box.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
+        final java.util.List<Object> controls = new java.util.ArrayList<Object>();
+        for (com.antarmakan.app.model.MenuOption g : m.options) {
+            box.addView(Ui.text(this, g.name, 15, Ui.TEXT, true));
+            box.addView(Ui.muted(this, g.typeLabel()));
+            if (com.antarmakan.app.model.MenuOption.BANYAK.equals(g.type)) {
+                java.util.List<android.widget.CheckBox> boxes = new java.util.ArrayList<android.widget.CheckBox>();
+                for (com.antarmakan.app.model.MenuOption.Choice c : g.choices) {
+                    android.widget.CheckBox cb = new android.widget.CheckBox(this);
+                    cb.setText(c.name + (c.price > 0 ? "  (+" + Fmt.rp(c.price) + ")" : ""));
+                    box.addView(cb);
+                    boxes.add(cb);
+                }
+                controls.add(boxes);
+            } else {
+                android.widget.RadioGroup rg = new android.widget.RadioGroup(this);
+                for (int i = 0; i < g.choices.size(); i++) {
+                    com.antarmakan.app.model.MenuOption.Choice c = g.choices.get(i);
+                    android.widget.RadioButton rb = new android.widget.RadioButton(this);
+                    rb.setId(1000 + i);
+                    rb.setText(c.name + (c.price > 0 ? "  (+" + Fmt.rp(c.price) + ")" : ""));
+                    rg.addView(rb);
+                }
+                box.addView(rg);
+                controls.add(rg);
+            }
+            box.addView(Ui.spacer(this, 8));
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(box);
+        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle(m.name + " • " + Fmt.rp(m.price))
+                .setView(sv)
+                .setPositiveButton("Tambah ke keranjang", null)
+                .setNegativeButton("Batal", null)
+                .create();
+        dlg.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public void onShow(android.content.DialogInterface d) {
+                dlg.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        StringBuilder sel = new StringBuilder();
+                        for (int gi = 0; gi < m.options.size(); gi++) {
+                            com.antarmakan.app.model.MenuOption g = m.options.get(gi);
+                            Object ctl = controls.get(gi);
+                            if (ctl instanceof android.widget.RadioGroup) {
+                                int id = ((android.widget.RadioGroup) ctl).getCheckedRadioButtonId();
+                                if (id >= 1000) {
+                                    if (sel.length() > 0) sel.append(';');
+                                    sel.append(g.name).append('=').append(g.choices.get(id - 1000).name);
+                                }
+                            } else {
+                                java.util.List<android.widget.CheckBox> boxes = (java.util.List<android.widget.CheckBox>) ctl;
+                                for (int ci = 0; ci < boxes.size(); ci++) {
+                                    if (boxes.get(ci).isChecked()) {
+                                        if (sel.length() > 0) sel.append(';');
+                                        sel.append(g.name).append('=').append(g.choices.get(ci).name);
+                                    }
+                                }
+                            }
+                        }
+                        long extra;
+                        try {
+                            extra = com.antarmakan.app.model.MenuOption.extraPrice(m.options, sel.toString());
+                        } catch (Exception e) {
+                            Ui.toast(RestaurantActivity.this, e.getMessage());
+                            return;
+                        }
+                        Cart.get(RestaurantActivity.this).add(resto.id, resto.name, m, sel.toString(), extra);
+                        dlg.dismiss();
+                        render();
+                    }
+                });
+            }
+        });
+        dlg.show();
     }
 
     private void toggleFav(final TextView btn) {

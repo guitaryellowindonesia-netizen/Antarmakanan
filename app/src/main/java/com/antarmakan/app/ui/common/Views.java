@@ -42,6 +42,10 @@ public final class Views {
                 + Fmt.rp(r.deliveryFee), 12, Ui.PRIMARY_DARK, true), Ui.weight(1));
         if (!r.active) {
             bottom.addView(Ui.badge(a, "MENUNGGU PERSETUJUAN", Ui.ACCENT));
+        } else if (r.isHolidayToday()) {
+            bottom.addView(Ui.badge(a, "LIBUR HARI INI", Ui.RED));
+        } else if (!r.inRange()) {
+            bottom.addView(Ui.badge(a, "DI LUAR JANGKAUAN", Ui.MUTED));
         } else if (!r.isOpenNow()) {
             bottom.addView(Ui.badge(a, "TUTUP • buka " + r.openHour, Ui.RED));
         } else {
@@ -50,7 +54,7 @@ public final class Views {
         info.addView(bottom, Ui.matchWrap());
         row.addView(info, Ui.weight(1));
         card.addView(row);
-        if (!r.isOpenNow()) card.setAlpha(0.65f);
+        if (!r.isOpenNow() || !r.inRange()) card.setAlpha(0.65f);
         card.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -77,6 +81,9 @@ public final class Views {
         for (OrderItem it : o.items) {
             if (sb.length() > 0) sb.append(", ");
             sb.append(it.qty).append("x ").append(it.name);
+            if (it.options.length() > 0) {
+                sb.append(" (").append(com.antarmakan.app.model.MenuOption.describe(it.options)).append(")");
+            }
         }
         TextView items = Ui.body(a, sb.toString());
         items.setMaxLines(2);
@@ -202,10 +209,26 @@ public final class Views {
                 a.startActivity(new Intent(a, ProfileActivity.class));
             }
         }));
+        if (u.isCustomer()) {
+            menu.addView(menuRow(a, "⚠️", "Komplain saya", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    a.startActivity(new Intent(a, ComplaintsActivity.class));
+                }
+            }));
+        }
+        if (u.isMerchant()) {
+            menu.addView(menuRow(a, "📊", "Laporan penjualan", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    a.startActivity(new Intent(a, ReportActivity.class));
+                }
+            }));
+        }
         menu.addView(menuRow(a, "💬", "Bantuan (WhatsApp CS)", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Ui.whatsapp(a, Config.CS_PHONE, "Halo CS " + Config.NAMA_APLIKASI + ", saya " + u.name
+                Ui.whatsapp(a, com.antarmakan.app.util.AppSettings.CS_PHONE, "Halo CS " + Config.NAMA_APLIKASI + ", saya " + u.name
                         + " (" + u.phone + ") butuh bantuan.");
             }
         }));

@@ -14,6 +14,11 @@ public class MenuItem {
     public long price;
     public boolean available = true;
     public boolean recommended;
+    public java.util.List<MenuOption> options = new java.util.ArrayList<MenuOption>();
+
+    public boolean hasOptions() {
+        return !options.isEmpty();
+    }
 
     public JSONObject toJson() throws JSONException {
         JSONObject o = new JSONObject();
@@ -27,6 +32,9 @@ public class MenuItem {
         o.put("price", price);
         o.put("available", available);
         o.put("recommended", recommended);
+        org.json.JSONArray arr = new org.json.JSONArray();
+        for (MenuOption g : options) arr.put(g.toJson());
+        o.put("options", arr);
         return o;
     }
 
@@ -42,6 +50,13 @@ public class MenuItem {
         m.price = o.optLong("price");
         m.available = o.optBoolean("available", true);
         m.recommended = o.optBoolean("recommended");
+        org.json.JSONArray arr = o.optJSONArray("options");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject g = arr.optJSONObject(i);
+                if (g != null) m.options.add(MenuOption.fromJson(g));
+            }
+        }
         return m;
     }
 }

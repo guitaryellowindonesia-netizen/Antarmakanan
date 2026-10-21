@@ -40,22 +40,31 @@ public class Cart {
         return !items.isEmpty() && !restoId.equals(rid);
     }
 
+    /** Total jumlah sebuah menu (semua varian). */
     public int qtyOf(String menuId) {
-        CartItem ci = find(menuId);
-        return ci == null ? 0 : ci.qty;
+        int n = 0;
+        for (CartItem ci : items) if (ci.menuId.equals(menuId)) n += ci.qty;
+        return n;
     }
 
     public void add(String rid, String rname, MenuItem m) {
+        add(rid, rname, m, "", 0);
+    }
+
+    /** Tambah menu dengan pilihan varian (options) & tambahan harga. */
+    public void add(String rid, String rname, MenuItem m, String options, long extra) {
         if (isFromOtherResto(rid)) clear();
         restoId = rid;
         restoName = rname;
-        CartItem ci = find(m.id);
+        String key = m.id + "|" + (options == null ? "" : options);
+        CartItem ci = find(key);
         if (ci == null) {
             ci = new CartItem();
             ci.menuId = m.id;
             ci.name = m.name;
             ci.emoji = m.emoji;
-            ci.price = m.price;
+            ci.price = m.price + extra;
+            ci.options = options == null ? "" : options;
             ci.qty = 0;
             items.add(ci);
         }
@@ -63,8 +72,23 @@ public class Cart {
         save();
     }
 
-    public void remove(String menuId) {
-        CartItem ci = find(menuId);
+    /** Tambah baris utuh (untuk "Pesan lagi"). */
+    public void addLine(String rid, String rname, CartItem line) {
+        if (isFromOtherResto(rid)) clear();
+        restoId = rid;
+        restoName = rname;
+        CartItem ci = find(line.key());
+        if (ci == null) {
+            items.add(line);
+        } else {
+            ci.qty += line.qty;
+        }
+        save();
+    }
+
+    /** Kurangi satu berdasarkan kunci baris. */
+    public void remove(String key) {
+        CartItem ci = find(key);
         if (ci == null) return;
         ci.qty--;
         if (ci.qty <= 0) items.remove(ci);
@@ -72,16 +96,26 @@ public class Cart {
         save();
     }
 
-    public void increase(String menuId) {
-        CartItem ci = find(menuId);
+    /** Kurangi satu dari menu (baris terakhir yang ditambahkan). */
+    public void removeOne(String menuId) {
+        for (int i = items.size() - 1; i >= 0; i--) {
+            if (items.get(i).menuId.equals(menuId)) {
+                remove(items.get(i).key());
+                return;
+            }
+        }
+    }
+
+    public void increase(String key) {
+        CartItem ci = find(key);
         if (ci != null) {
             ci.qty++;
             save();
         }
     }
 
-    public void setNote(String menuId, String note) {
-        CartItem ci = find(menuId);
+    public void setNote(String key, String note) {
+        CartItem ci = find(key);
         if (ci != null) {
             ci.note = note;
             save();
@@ -107,8 +141,8 @@ public class Cart {
         save();
     }
 
-    private CartItem find(String menuId) {
-        for (CartItem ci : items) if (ci.menuId.equals(menuId)) return ci;
+    private CartItem find(String key) {
+        for (CartItem ci : items) if (ci.key().equals(key)) return ci;
         return null;
     }
 
@@ -123,6 +157,7 @@ public class Cart {
                 o.put("p", ci.price);
                 o.put("q", ci.qty);
                 o.put("t", ci.note);
+                o.put("o", ci.options);
                 arr.put(o);
             }
             sp.edit().putString("resto", restoId).putString("rname", restoName)
@@ -145,6 +180,7 @@ public class Cart {
                 ci.price = o.getLong("p");
                 ci.qty = o.getInt("q");
                 ci.note = o.optString("t", "");
+                ci.options = o.optString("o", "");
                 items.add(ci);
             }
         } catch (Exception e) {

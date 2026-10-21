@@ -330,6 +330,10 @@ public class OrderDetailActivity extends BaseActivity {
         it.addView(Ui.label(this, "PESANAN (" + order.itemCount() + " item)"));
         for (OrderItem i : order.items) {
             Ui.keyValue(this, it, i.qty + "x  " + i.name, Fmt.rp(i.price * i.qty), false);
+            if (i.options.length() > 0) {
+                it.addView(Ui.text(this, "     • " + com.antarmakan.app.model.MenuOption.describe(i.options),
+                        12, Ui.MUTED, false));
+            }
             if (i.note.length() > 0) {
                 TextView n = Ui.text(this, "     📝 " + i.note, 12, Ui.ACCENT, false);
                 it.addView(n);
@@ -464,6 +468,39 @@ public class OrderDetailActivity extends BaseActivity {
                     @Override
                     public void onClick(View v) {
                         openChat();
+                    }
+                });
+            }
+            if (s == Order.SELESAI || s == Order.DIANTAR) {
+                btn(a, "⚠️ Laporkan Masalah", Ui.ACCENT, false).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Intent i = new Intent(OrderDetailActivity.this,
+                                com.antarmakan.app.ui.customer.ComplaintFormActivity.class);
+                        i.putExtra("orderId", order.id);
+                        startActivity(i);
+                    }
+                });
+            }
+            if (!order.isActive()) {
+                btn(a, "🔁 Pesan Lagi", Ui.PRIMARY, true).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        action("Menyiapkan keranjang...", new Async.Task<Integer>() {
+                            @Override
+                            public Integer run() throws Exception {
+                                return repo.reorder(order, com.antarmakan.app.util.Cart.get(OrderDetailActivity.this));
+                            }
+                        }, new Async.Callback<Integer>() {
+                            @Override
+                            public void onResult(Integer skipped) {
+                                if (skipped > 0) {
+                                    Ui.toast(OrderDetailActivity.this, skipped + " menu sedang tidak tersedia, dilewati");
+                                }
+                                startActivity(new Intent(OrderDetailActivity.this,
+                                        com.antarmakan.app.ui.customer.CartActivity.class));
+                            }
+                        });
                     }
                 });
             }

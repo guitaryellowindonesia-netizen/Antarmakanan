@@ -7,6 +7,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import com.antarmakan.app.model.MenuItem;
 import com.antarmakan.app.util.Async;
@@ -18,6 +19,7 @@ public class MenuEditActivity extends BaseFormActivity {
 
     private static final String[] CATEGORIES = {"Makanan", "Minuman", "Lauk", "Paket", "Cemilan"};
     private MenuItem m;
+    private LinearLayout optionsBox;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,6 +69,23 @@ public class MenuEditActivity extends BaseFormActivity {
         rec.setText("Tampilkan sebagai rekomendasi ⭐");
         rec.setChecked(m.recommended);
         c.addView(rec);
+
+        // varian & topping
+        c.addView(Ui.divider(this));
+        c.addView(Ui.title(this, "Pilihan varian & topping"));
+        c.addView(Ui.muted(this, "Contoh: Level pedas (wajib pilih satu), Topping (boleh banyak, berbayar)."));
+        optionsBox = Ui.vbox(this);
+        c.addView(optionsBox);
+        renderOptions();
+        TextView addOpt = Ui.smallButton(this, "+ Tambah grup pilihan", Ui.PRIMARY, false);
+        addOpt.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                optionDialog(null);
+            }
+        });
+        c.addView(addOpt);
+        c.addView(Ui.divider(this));
 
         Button save = Ui.primary(this, "Simpan Menu");
         save.setOnClickListener(new View.OnClickListener() {
@@ -126,5 +145,87 @@ public class MenuEditActivity extends BaseFormActivity {
             });
             c.addView(del);
         }
+    }
+
+    private void renderOptions() {
+        optionsBox.removeAllViews();
+        for (final com.antarmakan.app.model.MenuOption g : m.options) {
+            LinearLayout row = Ui.hbox(this);
+            row.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
+            LinearLayout info = Ui.vbox(this);
+            info.addView(Ui.text(this, g.name, 14, Ui.TEXT, true));
+            StringBuilder sb = new StringBuilder(g.typeLabel()).append(": ");
+            for (int i = 0; i < g.choices.size(); i++) {
+                com.antarmakan.app.model.MenuOption.Choice ch = g.choices.get(i);
+                if (i > 0) sb.append(", ");
+                sb.append(ch.name);
+                if (ch.price > 0) sb.append(" +").append(com.antarmakan.app.util.Fmt.rp(ch.price));
+            }
+            info.addView(Ui.muted(this, sb.toString()));
+            row.addView(info, Ui.weight(1));
+            TextView ed = Ui.smallButton(this, "Ubah", Ui.BLUE, false);
+            ed.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    optionDialog(g);
+                }
+            });
+            TextView del = Ui.smallButton(this, "Hapus", Ui.RED, false);
+            del.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    m.options.remove(g);
+                    renderOptions();
+                }
+            });
+            row.addView(ed);
+            row.addView(del);
+            optionsBox.addView(row, Ui.matchWrap());
+        }
+        if (m.options.isEmpty()) optionsBox.addView(Ui.muted(this, "Belum ada pilihan."));
+    }
+
+    private void optionDialog(final com.antarmakan.app.model.MenuOption existing) {
+        LinearLayout box = Ui.vbox(this);
+        box.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
+        box.addView(Ui.label(this, "Nama grup"));
+        final EditText name = Ui.edit(this, "Contoh: Level pedas / Topping");
+        box.addView(name);
+        box.addView(Ui.label(this, "Jenis"));
+        final String[] types = {com.antarmakan.app.model.MenuOption.WAJIB_SATU,
+                com.antarmakan.app.model.MenuOption.OPSIONAL_SATU, com.antarmakan.app.model.MenuOption.BANYAK};
+        final Spinner type = Ui.spinner(this, new String[]{"Wajib pilih satu", "Boleh pilih satu", "Boleh pilih banyak"}, 0);
+        box.addView(type);
+        box.addView(Ui.label(this, "Pilihan (satu per baris, harga tambahan pakai =)"));
+        final EditText choices = Ui.multiline(this, "Tidak pedas\nSedang\nPedas\nTelur=3000");
+        choices.setMinLines(4);
+        box.addView(choices);
+        if (existing != null) {
+            name.setText(existing.name);
+            type.setSelection(Ui.indexOf(types, existing.type));
+            choices.setText(existing.choicesText());
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(existing == null ? "Tambah grup pilihan" : "Ubah grup pilihan")
+                .setView(box)
+                .setPositiveButton("Simpan", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        com.antarmakan.app.model.MenuOption g = existing != null ? existing
+                                : new com.antarmakan.app.model.MenuOption();
+                        g.name = name.getText().toString().trim().replace(";", ",").replace("=", "-");
+                        g.type = types[type.getSelectedItemPosition()];
+                        g.choices = com.antarmakan.app.model.MenuOption.parseChoices(
+                                choices.getText().toString().replace(";", ","));
+                        if (g.name.length() == 0 || g.choices.isEmpty()) {
+                            Ui.toast(MenuEditActivity.this, "Isi nama grup & minimal satu pilihan");
+                            return;
+                        }
+                        if (existing == null) m.options.add(g);
+                        renderOptions();
+                    }
+                })
+                .setNegativeButton("Batal", null)
+                .show();
     }
 }

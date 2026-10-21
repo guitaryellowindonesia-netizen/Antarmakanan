@@ -191,7 +191,7 @@ public class LoginActivity extends BaseActivity {
                                         .setPositiveButton("Chat Admin", new android.content.DialogInterface.OnClickListener() {
                                             @Override
                                             public void onClick(android.content.DialogInterface d, int w) {
-                                                Ui.whatsapp(LoginActivity.this, Config.CS_PHONE,
+                                                Ui.whatsapp(LoginActivity.this, com.antarmakan.app.util.AppSettings.CS_PHONE,
                                                         "Halo admin, saya " + n + " (" + ph
                                                                 + ") mengajukan pemulihan akun AntarMakan.");
                                             }

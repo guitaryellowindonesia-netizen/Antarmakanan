@@ -7,6 +7,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import com.antarmakan.app.Config;
 import com.antarmakan.app.data.AppException;
@@ -83,6 +84,59 @@ public class RestoEditActivity extends BaseFormActivity {
         c.addView(hours);
 
         pinSection(c, "Titik lokasi resto (untuk ongkir & navigasi driver)", r.lat, r.lng);
+        final EditText maxKm = field(c, "Jarak antar maksimal (km, kosongkan = ikut aturan umum "
+                        + com.antarmakan.app.util.AppSettings.JARAK_ANTAR_MAKS_KM + " km)",
+                r.maxKm > 0 ? String.valueOf((int) r.maxKm) : "", Ui.number(this, "contoh: 10"));
+
+        // hari libur rutin
+        c.addView(Ui.label(this, "Hari libur rutin (centang hari tutup)"));
+        final String[] days = {"Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"};
+        final CheckBox[] dayBoxes = new CheckBox[7];
+        LinearLayout dayRow1 = Ui.hbox(this), dayRow2 = Ui.hbox(this);
+        java.util.List<String> closed = java.util.Arrays.asList(r.closedDays.split(","));
+        for (int i = 0; i < 7; i++) {
+            dayBoxes[i] = new CheckBox(this);
+            dayBoxes[i].setText(days[i]);
+            dayBoxes[i].setChecked(closed.contains(String.valueOf(i + 1)));
+            (i < 4 ? dayRow1 : dayRow2).addView(dayBoxes[i], Ui.weight(1));
+        }
+        c.addView(dayRow1);
+        c.addView(dayRow2);
+
+        // libur sementara
+        c.addView(Ui.label(this, "Libur sementara (mis. lebaran / renovasi)"));
+        LinearLayout hol = Ui.hbox(this);
+        final TextView holText = Ui.text(this, r.holidayUntil.length() > 0 ? "Libur s/d " + r.holidayUntil : "Tidak libur",
+                14, Ui.TEXT, true);
+        hol.addView(holText, Ui.weight(1));
+        final String[] holiday = {r.holidayUntil};
+        TextView pickHol = Ui.smallButton(this, "Pilih tanggal", Ui.PRIMARY, false);
+        pickHol.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                new android.app.DatePickerDialog(RestoEditActivity.this, new android.app.DatePickerDialog.OnDateSetListener() {
+                    @Override
+                    public void onDateSet(android.widget.DatePicker dp, int y, int m, int d) {
+                        holiday[0] = String.format(java.util.Locale.US, "%04d-%02d-%02d", y, m + 1, d);
+                        holText.setText("Libur s/d " + holiday[0]);
+                    }
+                }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH),
+                        cal.get(java.util.Calendar.DAY_OF_MONTH)).show();
+            }
+        });
+        TextView clearHol = Ui.smallButton(this, "Hapus", Ui.RED, false);
+        clearHol.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                holiday[0] = "";
+                holText.setText("Tidak libur");
+            }
+        });
+        hol.addView(pickHol);
+        hol.addView(clearHol);
+        c.addView(hol);
+
         final CheckBox self = new CheckBox(this);
         self.setText("🛵 Antar sendiri (ongkir 100% untuk penjual)");
         self.setChecked(r.selfDelivery);
@@ -117,6 +171,13 @@ public class RestoEditActivity extends BaseFormActivity {
                 r.openHour = normHour(open.getText().toString(), "08:00");
                 r.closeHour = normHour(close.getText().toString(), "21:00");
                 r.selfDelivery = self.isChecked();
+                r.maxKm = com.antarmakan.app.util.Fmt.parseLong(maxKm.getText().toString());
+                StringBuilder cd = new StringBuilder();
+                for (int i = 0; i < 7; i++) {
+                    if (dayBoxes[i].isChecked()) cd.append(cd.length() > 0 ? "," : "").append(i + 1);
+                }
+                r.closedDays = cd.toString();
+                r.holidayUntil = holiday[0];
                 final String ownerPh = owner.getText().toString().trim();
                 if (me.isAdmin()) {
                     r.active = active.isChecked();

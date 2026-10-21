@@ -59,11 +59,11 @@ public final class Geo {
     }
 
     public static int deliveryFee(double km) {
-        double fee = Config.ONGKIR_DASAR;
-        if (km > Config.JARAK_DASAR_KM) {
-            fee += Math.ceil(km - Config.JARAK_DASAR_KM) * Config.ONGKIR_PER_KM;
+        double fee = com.antarmakan.app.util.AppSettings.ONGKIR_DASAR;
+        if (km > com.antarmakan.app.util.AppSettings.JARAK_DASAR_KM) {
+            fee += Math.ceil(km - com.antarmakan.app.util.AppSettings.JARAK_DASAR_KM) * com.antarmakan.app.util.AppSettings.ONGKIR_PER_KM;
         }
-        int f = (int) Math.min(fee, Config.ONGKIR_MAKS);
+        int f = (int) Math.min(fee, com.antarmakan.app.util.AppSettings.ONGKIR_MAKS);
         return (f + 499) / 500 * 500; // bulatkan ke 500 ke atas
     }
 

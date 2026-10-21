@@ -31,6 +31,16 @@ Satu aplikasi untuk 4 peran: **Pelanggan, Mitra Resto, Driver, Admin**.
 - Pelanggan melihat peta 🛵 pengantar, 🏪 resto, 🏠 rumah + sisa jarak & perkiraan tiba
 - Tombol **🧭 Navigasi** membuka Google Maps langsung ke titik tujuan
 
+### ⚙️ Operasional
+- **Pengaturan dari Admin** (tanpa build ulang): tarif ongkir, komisi, biaya layanan, minimal top up,
+  info transfer, nomor CS, batas waktu batal, radius driver, jarak antar maksimal
+- **Radius**: driver hanya melihat order dari resto di sekitarnya; resto bisa membatasi jarak antar
+- **Varian menu**: level pedas, ukuran, topping berbayar (wajib/opsional/pilih banyak)
+- **Hari libur resto**: libur rutin mingguan & libur sementara sampai tanggal tertentu
+- **Pesan lagi**, urutkan resto (terdekat / rating / ongkir termurah), filter "buka saja"
+- **Komplain** pesanan dengan foto bukti; admin bisa mengembalikan dana ke saldo
+- **Laporan & grafik** penjualan (7/14/30 hari), menu terlaris, ekspor CSV untuk Excel
+
 ### 🔔 Notifikasi (semua pengguna)
 - Pesanan baru, status pesanan, order baru untuk driver, chat, ulasan, top up, persetujuan akun
 - Pengumuman/promo dari admin ke semua pengguna atau peran tertentu

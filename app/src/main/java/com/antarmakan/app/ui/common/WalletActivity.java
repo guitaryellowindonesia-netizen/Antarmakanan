@@ -114,9 +114,9 @@ public class WalletActivity extends BaseActivity {
     private void topUpDialog() {
         LinearLayout box = Ui.vbox(this);
         box.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
-        box.addView(Ui.body(this, Config.INFO_TRANSFER));
+        box.addView(Ui.body(this, com.antarmakan.app.util.AppSettings.INFO_TRANSFER));
         box.addView(Ui.spacer(this, 8));
-        box.addView(Ui.label(this, "Nominal (min " + Fmt.rp(Config.MIN_TOPUP) + ")"));
+        box.addView(Ui.label(this, "Nominal (min " + Fmt.rp(com.antarmakan.app.util.AppSettings.MIN_TOPUP) + ")"));
         final EditText amount = Ui.number(this, "50000");
         box.addView(amount);
         box.addView(Ui.label(this, "Nama pengirim / bank"));

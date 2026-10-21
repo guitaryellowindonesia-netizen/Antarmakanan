@@ -115,8 +115,8 @@ public class AdminMainActivity extends TabbedActivity {
                 gmv += o.total;
                 if (o.createdAt >= today) gmvToday += o.total;
                 revenue += o.serviceFee - o.discount
-                        + o.subtotal * com.antarmakan.app.Config.KOMISI_PERSEN_RESTO / 100
-                        + (o.selfDelivery ? 0 : o.deliveryFee * com.antarmakan.app.Config.KOMISI_PERSEN_DRIVER / 100);
+                        + o.subtotal * com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_RESTO / 100
+                        + (o.selfDelivery ? 0 : o.deliveryFee * com.antarmakan.app.util.AppSettings.KOMISI_PERSEN_DRIVER / 100);
             }
         }
         int customers = 0, drivers = 0, driversOnline = 0, pendingDrivers = 0, merchants = 0;
@@ -569,6 +569,32 @@ public class AdminMainActivity extends TabbedActivity {
             });
             page.addView(c);
         }
+
+        // pengaturan
+        page.addView(Ui.section(this, "⚙️ Pengaturan"));
+        LinearLayout set = Ui.card(this);
+        set.addView(Views.menuRow(this, "⚙️", "Tarif ongkir, komisi, biaya layanan & batas waktu",
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        startActivity(new Intent(AdminMainActivity.this, SettingsActivity.class));
+                    }
+                }));
+        set.addView(Views.menuRow(this, "📊", "Laporan & grafik penjualan", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(AdminMainActivity.this,
+                        com.antarmakan.app.ui.common.ReportActivity.class));
+            }
+        }));
+        set.addView(Views.menuRow(this, "⚠️", "Komplain pelanggan", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(AdminMainActivity.this,
+                        com.antarmakan.app.ui.common.ComplaintsActivity.class));
+            }
+        }));
+        page.addView(set);
 
         // pengumuman
         page.addView(Ui.section(this, "📢 Pengumuman"));
