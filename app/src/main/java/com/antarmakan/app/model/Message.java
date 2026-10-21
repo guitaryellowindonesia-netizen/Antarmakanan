@@ -10,6 +10,7 @@ public class Message {
     public String senderName = "";
     public String senderRole = "";
     public String text = "";
+    public String imageId = "";   // foto (koleksi "images")
     public long createdAt;
 
     public JSONObject toJson() throws JSONException {
@@ -20,6 +21,7 @@ public class Message {
         o.put("senderName", senderName);
         o.put("senderRole", senderRole);
         o.put("text", text);
+        if (imageId.length() > 0) o.put("imageId", imageId);
         o.put("createdAt", createdAt);
         return o;
     }
@@ -32,6 +34,7 @@ public class Message {
         m.senderName = o.optString("senderName");
         m.senderRole = o.optString("senderRole");
         m.text = o.optString("text");
+        m.imageId = o.optString("imageId");
         m.createdAt = o.optLong("createdAt");
         return m;
     }

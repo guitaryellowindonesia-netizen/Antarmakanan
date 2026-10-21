@@ -1140,7 +1140,12 @@ public class Repo {
     // =====================================================================
 
     public void sendMessage(String orderId, User from, String text) throws Exception {
-        if (text.trim().length() == 0) return;
+        sendMessage(orderId, from, text, "");
+    }
+
+    /** Kirim pesan chat (teks dan/atau foto). */
+    public void sendMessage(String orderId, User from, String text, String imageId) throws Exception {
+        if (text.trim().length() == 0 && (imageId == null || imageId.length() == 0)) return;
         Message m = new Message();
         m.id = Ids.newId();
         m.orderId = orderId;
@@ -1148,6 +1153,7 @@ public class Repo {
         m.senderName = from.name;
         m.senderRole = from.role;
         m.text = text.trim();
+        m.imageId = imageId == null ? "" : imageId;
         m.createdAt = now();
         s.put(MSGS, m.id, m.toJson());
         try {
@@ -1158,7 +1164,8 @@ public class Repo {
             to.add(o.restoOwnerId);
             if (o.hasDriver()) to.add(o.driverId);
             to.remove(from.id);
-            for (String uid : to) notify(uid, title, m.text, orderId);
+            String body = m.imageId.length() > 0 ? "📷 Foto" + (m.text.length() > 0 ? ": " + m.text : "") : m.text;
+            for (String uid : to) notify(uid, title, body, orderId);
         } catch (Exception ignored) {
         }
     }

@@ -67,6 +67,18 @@ public final class Images {
         return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
     }
 
+    /** Kompres bitmap (mis. foto kamera kecil) menjadi base64 JPEG. */
+    public static String encode(Bitmap bmp) {
+        float scale = Math.min(1f, (float) MAX_SIZE / Math.max(bmp.getWidth(), bmp.getHeight()));
+        if (scale < 1f) {
+            bmp = Bitmap.createScaledBitmap(bmp, Math.round(bmp.getWidth() * scale),
+                    Math.round(bmp.getHeight() * scale), true);
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.JPEG, QUALITY, out);
+        return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+    }
+
     private static int rotation(Context c, Uri uri) {
         if (android.os.Build.VERSION.SDK_INT < 24) return 0;
         try {
