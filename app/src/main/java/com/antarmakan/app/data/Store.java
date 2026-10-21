@@ -13,6 +13,9 @@ public interface Store {
 
     JSONObject get(String col, String id) throws Exception;
 
+    /** Baca data yang boleh dibaca tanpa login (mis. logins/{nomorHP}). */
+    JSONObject getPublic(String col, String id) throws Exception;
+
     List<JSONObject> list(String col) throws Exception;
 
     /** Ambil dokumen yang field-nya sama dengan value (String/Number/Boolean). */
@@ -24,6 +27,12 @@ public interface Store {
     void put(String col, String id, JSONObject obj) throws Exception;
 
     void delete(String col, String id) throws Exception;
+
+    /**
+     * Ubah beberapa lokasi sekaligus secara atomic (semua berhasil atau semua gagal).
+     * Key = path lengkap, mis. "users/abc/balance". Nilai null = hapus.
+     */
+    void update(java.util.Map<String, Object> paths) throws Exception;
 
     /**
      * Ubah dokumen secara aman (atomic) walau diakses banyak HP bersamaan.

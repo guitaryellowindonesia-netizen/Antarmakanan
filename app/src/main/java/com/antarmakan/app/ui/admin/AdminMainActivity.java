@@ -409,20 +409,80 @@ public class AdminMainActivity extends TabbedActivity {
         load(new Async.Task<Object[]>() {
             @Override
             public Object[] run() throws Exception {
-                return new Object[]{repo.me(), repo.promos(false), repo.topUps(null)};
+                return new Object[]{repo.me(), repo.promos(false), repo.topUps(null), repo.recoveryRequests()};
             }
         }, new Async.Callback<Object[]>() {
             @Override
             @SuppressWarnings("unchecked")
             public void onResult(Object[] r) {
-                renderMore((User) r[0], (List<Promo>) r[1], (List<TopUp>) r[2]);
+                renderMore((User) r[0], (List<Promo>) r[1], (List<TopUp>) r[2],
+                        (List<org.json.JSONObject>) r[3]);
             }
         });
     }
 
-    private void renderMore(User me, List<Promo> promos, List<TopUp> topups) {
+    private void renderMore(User me, List<Promo> promos, List<TopUp> topups,
+                            List<org.json.JSONObject> recoveries) {
         LinearLayout page = Ui.vbox(this);
         page.addView(Views.header(this, "Lainnya", null));
+
+        // permintaan pemulihan akun (lupa sandi tanpa email)
+        if (!recoveries.isEmpty()) {
+            page.addView(Ui.section(this, "🔐 Permintaan Pemulihan Akun"));
+            for (final org.json.JSONObject r : recoveries) {
+                final String ph = r.optString("phone", r.optString("id"));
+                LinearLayout c = Ui.card(this);
+                c.addView(Ui.text(this, r.optString("name") + " • " + ph, 15, Ui.TEXT, true));
+                c.addView(Ui.muted(this, "Diajukan " + Fmt.date(r.optLong("createdAt"))
+                        + ". Verifikasi lewat WhatsApp sebelum menyetujui."));
+                LinearLayout a = Ui.hbox(this);
+                TextView wa = Ui.smallButton(this, "WhatsApp", Ui.PRIMARY, false);
+                wa.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Ui.whatsapp(AdminMainActivity.this, ph, "Halo, terkait pemulihan akun AntarMakan Anda.");
+                    }
+                });
+                TextView ok = Ui.smallButton(this, "✅ Setujui", Ui.PRIMARY, true);
+                ok.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Ui.confirm(AdminMainActivity.this, "Setujui pemulihan",
+                                "Pindahkan akun " + ph + " ke kata sandi baru? Pastikan sudah diverifikasi.",
+                                "Setujui", new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        exec(new Async.Task<Boolean>() {
+                                            @Override
+                                            public Boolean run() throws Exception {
+                                                repo.approveRecovery(ph);
+                                                return true;
+                                            }
+                                        }, "Akun dipulihkan");
+                                    }
+                                });
+                    }
+                });
+                TextView no = Ui.smallButton(this, "Tolak", Ui.RED, false);
+                no.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        exec(new Async.Task<Boolean>() {
+                            @Override
+                            public Boolean run() throws Exception {
+                                repo.rejectRecovery(ph);
+                                return true;
+                            }
+                        }, "Permintaan ditolak");
+                    }
+                });
+                a.addView(wa);
+                a.addView(ok);
+                a.addView(no);
+                c.addView(a);
+                page.addView(c);
+            }
+        }
 
         // permintaan saldo
         page.addView(Ui.section(this, "💰 Permintaan Top Up / Penarikan"));

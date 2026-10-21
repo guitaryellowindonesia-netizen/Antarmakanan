@@ -15,7 +15,7 @@ import java.util.Map;
  * Login/daftar memakai Firebase Authentication lewat REST API.
  * Nomor HP diubah menjadi email semu: 08123@antarmakan.app
  */
-public class FirebaseAuthRest {
+public class FirebaseAuthRest implements TokenSource {
     private static final String BASE = "https://identitytoolkit.googleapis.com/v1/accounts:";
     private static final String TOKEN_URL = "https://securetoken.googleapis.com/v1/token?key=";
 
@@ -25,18 +25,59 @@ public class FirebaseAuthRest {
         sp = c.getApplicationContext().getSharedPreferences("firebase_auth", Context.MODE_PRIVATE);
     }
 
-    private static String email(String phone) {
+    /** Email semu untuk akun nomor HP (dipakai bila tidak ada email asli). */
+    public static String fakeEmail(String phone) {
         return phone.replaceAll("[^0-9]", "") + "@antarmakan.app";
     }
 
-    /** Daftar akun baru, mengembalikan uid. */
-    public synchronized String signUp(String phone, String password) throws Exception {
-        return call("signUp", phone, password);
+    public static boolean isFakeEmail(String email) {
+        return email == null || email.endsWith("@antarmakan.app");
     }
 
-    /** Masuk, mengembalikan uid. */
-    public synchronized String signIn(String phone, String password) throws Exception {
-        return call("signInWithPassword", phone, password);
+    /** Daftar akun baru dengan email (asli atau semu), mengembalikan uid. */
+    public synchronized String signUpEmail(String email, String password) throws Exception {
+        return call("signUp", email, password);
+    }
+
+    /** Masuk dengan email (asli atau semu), mengembalikan uid. */
+    public synchronized String signInEmail(String email, String password) throws Exception {
+        return call("signInWithPassword", email, password);
+    }
+
+    /** Ganti email login akun yang sedang masuk (untuk pemulihan sandi). */
+    public synchronized void updateEmail(String newEmail) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("idToken", idToken());
+        body.put("email", newEmail);
+        body.put("returnSecureToken", true);
+        JSONObject o = post("update", body);
+        if (o.has("idToken")) {
+            save(o.getString("idToken"), o.getString("refreshToken"),
+                    o.optLong("expiresIn", 3600), o.getString("localId"));
+        }
+    }
+
+    /** Kirim email berisi link untuk membuat kata sandi baru. */
+    public void sendPasswordReset(String email) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("requestType", "PASSWORD_RESET");
+        body.put("email", email);
+        post("sendOobCode", body);
+    }
+
+    /** Hapus akun login yang sedang masuk. */
+    public synchronized void deleteAccount() throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("idToken", idToken());
+        post("delete", body);
+    }
+
+    private JSONObject post(String action, JSONObject body) throws Exception {
+        Http.Response r = Http.request("POST", BASE + action + "?key=" + Config.FIREBASE_API_KEY,
+                body.toString(), null);
+        JSONObject o = new JSONObject(r.body.length() == 0 ? "{}" : r.body);
+        if (r.code != 200) throw new AppException(translate(o));
+        return o;
     }
 
     /** Hasil login Google */
@@ -67,9 +108,9 @@ public class FirebaseAuthRest {
         return g;
     }
 
-    private String call(String action, String phone, String password) throws Exception {
+    private String call(String action, String email, String password) throws Exception {
         JSONObject body = new JSONObject();
-        body.put("email", email(phone));
+        body.put("email", email);
         body.put("password", password);
         body.put("returnSecureToken", true);
         Http.Response r = Http.request("POST", BASE + action + "?key=" + Config.FIREBASE_API_KEY,
@@ -111,7 +152,10 @@ public class FirebaseAuthRest {
     private static String translate(JSONObject o) {
         JSONObject err = o.optJSONObject("error");
         String msg = err == null ? "" : err.optString("message");
-        if (msg.startsWith("EMAIL_EXISTS")) return "Nomor HP sudah terdaftar";
+        if (msg.startsWith("EMAIL_EXISTS")) return "Nomor HP / email sudah terdaftar";
+        if (msg.startsWith("INVALID_EMAIL")) return "Format email tidak valid";
+        if (msg.startsWith("CREDENTIAL_TOO_OLD") || msg.startsWith("TOKEN_EXPIRED"))
+            return "Demi keamanan, keluar lalu masuk lagi, kemudian ulangi";
         if (msg.startsWith("EMAIL_NOT_FOUND") || msg.startsWith("INVALID_PASSWORD")
                 || msg.startsWith("INVALID_LOGIN_CREDENTIALS")) return "Nomor HP atau kata sandi salah";
         if (msg.startsWith("WEAK_PASSWORD")) return "Kata sandi minimal 6 karakter";

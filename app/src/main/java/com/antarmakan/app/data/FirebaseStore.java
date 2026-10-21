@@ -14,27 +14,55 @@ import java.util.Map;
 /** Penyimpanan online memakai Firebase Realtime Database (REST API). */
 public class FirebaseStore implements Store {
 
-    private final FirebaseAuthRest auth;
+    private final TokenSource auth;
     private final String base;
+    private final String fixedQuery;   // mis. "ns=test" untuk emulator
 
-    public FirebaseStore(FirebaseAuthRest auth) {
+    public FirebaseStore(TokenSource auth) {
+        this(auth, Config.FIREBASE_DB_URL, null);
+    }
+
+    public FirebaseStore(TokenSource auth, String baseUrl, String fixedQuery) {
         this.auth = auth;
-        String b = Config.FIREBASE_DB_URL.trim();
+        String b = baseUrl.trim();
         while (b.endsWith("/")) b = b.substring(0, b.length() - 1);
         this.base = b;
+        this.fixedQuery = fixedQuery;
     }
 
     private String url(String col, String id, String extra) throws Exception {
-        StringBuilder sb = new StringBuilder(base).append('/').append(col);
+        StringBuilder sb = new StringBuilder(base);
+        if (col != null) sb.append('/').append(col);
         if (id != null) sb.append('/').append(URLEncoder.encode(id, "UTF-8"));
-        sb.append(".json?auth=").append(auth.idToken());
+        sb.append(col == null ? "/.json" : ".json").append("?auth=").append(auth.idToken());
+        if (fixedQuery != null) sb.append('&').append(fixedQuery);
         if (extra != null) sb.append('&').append(extra);
         return sb.toString();
     }
 
+    /** Baca data publik (tanpa login), mis. logins/{nomorHP}. */
+    @Override
+    public JSONObject getPublic(String col, String id) throws Exception {
+        String u = base + "/" + col + "/" + URLEncoder.encode(id, "UTF-8") + ".json"
+                + (fixedQuery != null ? "?" + fixedQuery : "");
+        Http.Response r = Http.request("GET", u, null, null);
+        check(r);
+        return parseObj(r.body);
+    }
+
+    @Override
+    public void update(Map<String, Object> paths) throws Exception {
+        JSONObject body = new JSONObject();
+        for (Map.Entry<String, Object> e : paths.entrySet()) {
+            body.put(e.getKey(), e.getValue() == null ? JSONObject.NULL : e.getValue());
+        }
+        Http.Response r = Http.request("PATCH", url(null, null, "print=silent"), body.toString(), null);
+        check(r);
+    }
+
     private static void check(Http.Response r) {
         if (r.code == 401 || r.code == 403) {
-            throw new AppException("Akses ditolak server. Cek Rules Firebase / login ulang");
+            throw new PermissionDeniedException("Akses ditolak server. Cek Rules Firebase / login ulang");
         }
         if (r.code == 400 && r.body.contains("Index not defined")) {
             throw new AppException("Index belum dibuat. Pasang Rules dari README di Firebase");

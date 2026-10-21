@@ -191,6 +191,7 @@ public final class NotifCenter {
         User u = repo.me();
         if (u.isMerchant()) {
             Restaurant r = repo.restoOfOwner(u.id);
+            if (r != null) repo.ordersOfResto(r.id); // sekalian batalkan pesanan yang kedaluwarsa
             return r != null && r.isOpen ? "Siap menerima pesanan" : null;
         }
         if (u.isDriver()) return u.online && u.active ? "Kamu online, menunggu order" : null;

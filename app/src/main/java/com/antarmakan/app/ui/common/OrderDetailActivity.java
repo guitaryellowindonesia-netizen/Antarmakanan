@@ -439,6 +439,26 @@ public class OrderDetailActivity extends BaseActivity {
                     }
                 });
             }
+            if (com.antarmakan.app.data.Repo.canCancelNoDriver(order)) {
+                btn(a, "Batalkan (belum ada driver)", Ui.RED, false).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Ui.confirm(OrderDetailActivity.this, "Batalkan pesanan?",
+                                "Belum ada driver yang mengambil pesanan ini. Dana saldo akan dikembalikan.",
+                                "Ya, batalkan", new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        doAction(new Async.Task<Order>() {
+                                            @Override
+                                            public Order run() throws Exception {
+                                                return repo.customerCancelNoDriver(order.id);
+                                            }
+                                        }, "Pesanan dibatalkan");
+                                    }
+                                });
+                    }
+                });
+            }
             if (order.isActive() && order.hasDriver()) {
                 btn(a, "💬 Chat Driver", Ui.PRIMARY, false).setOnClickListener(new View.OnClickListener() {
                     @Override

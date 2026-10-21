@@ -90,6 +90,11 @@ public final class Config {
             "Transfer ke:\n082286504869\na.n. Yogi Ismayadi\n\n"
             + "Saldo masuk setelah dicek admin.";
 
+    /** Pesanan dibatalkan otomatis bila resto tidak merespons (menit) */
+    public static final int BATAS_RESPON_RESTO_MENIT = 10;
+    /** Pelanggan boleh membatalkan bila belum ada driver setelah (menit) */
+    public static final int BATAS_CARI_DRIVER_MENIT = 20;
+
     /** Minimal top up saldo */
     public static final int MIN_TOPUP = 10000;
 

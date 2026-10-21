@@ -167,11 +167,27 @@ Tampilan dibuat lewat kode Java (`util/Ui.java`) sehingga hampir tidak ada file 
 
 ---
 
+## 🔒 Keamanan (Rules Firebase)
+`database.rules.json` memeriksa setiap perubahan di server, sehingga dari HP **tidak bisa**:
+- menambah saldo sendiri / mencatat transaksi palsu (saldo = buku besar `wallet/{uid}` yang divalidasi per pesanan)
+- menjadi admin, mengaktifkan akun driver sendiri, menyetujui resto sendiri
+- mengubah total/diskon pesanan, menyelesaikan pesanan orang lain, merebut order driver lain
+- memalsukan rating, promo, chat atas nama orang lain, atau lokasi pengantar
+
+Rules diuji dengan Firebase Emulator (45 skenario normal & serangan).
+**Wajib Publish ulang Rules setiap kali file ini berubah.**
+
+## 🔐 Akun
+- **Lupa kata sandi**: link reset dikirim ke *email pemulihan* (atur saat daftar atau di Ubah Profil).
+  Akun tanpa email bisa *ajukan pemulihan* → admin verifikasi via WhatsApp → setujui di Admin › Lainnya.
+- **Hapus akun**: Akun › Hapus Akun (saldo harus Rp0 & tidak ada pesanan aktif). Riwayat transaksi tetap disimpan.
+- **Batal otomatis**: pesanan dibatalkan bila resto tidak merespons 10 menit; pelanggan boleh membatalkan
+  bila 20 menit belum ada driver. Dana saldo dikembalikan otomatis.
+
 ## ⚠️ Catatan sebelum dipakai sungguhan
-- **Keamanan:** Rules Firebase di atas hanya mewajibkan login. Pengguna yang paham teknis
-  secara teori bisa mengubah data (mis. saldo) lewat API. Untuk skala besar/uang sungguhan,
-  pindahkan logika saldo & status pesanan ke **Firebase Cloud Functions** atau server sendiri,
-  dan perketat Rules per peran.
+- **Keamanan:** Rules sudah memvalidasi saldo & pesanan. Celah yang tersisa (perlu server /
+  Cloud Functions): penyalahgunaan promo oleh pelanggan + mitra yang bekerja sama, dan data
+  nomor HP pengguna bisa dibaca sesama pengguna yang login.
 - **Top up saldo** diverifikasi manual oleh admin (belum terhubung payment gateway seperti Midtrans/Xendit).
 - **Lokasi** dihitung per kecamatan (bukan GPS), cukup untuk tarif ongkir sederhana.
 - **Notifikasi** berupa bunyi saat aplikasi terbuka; notifikasi push saat aplikasi tertutup butuh Firebase Cloud Messaging.

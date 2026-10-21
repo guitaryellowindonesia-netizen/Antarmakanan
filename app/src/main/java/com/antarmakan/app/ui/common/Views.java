@@ -220,6 +220,38 @@ public final class Views {
                         .show();
             }
         }));
+        if (!u.isAdmin()) {
+            menu.addView(menuRow(a, "🗑️", "Hapus Akun", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Ui.prompt(a, "Hapus akun permanen?",
+                            "Ketik HAPUS untuk konfirmasi", "", android.text.InputType.TYPE_CLASS_TEXT
+                                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS, new Ui.TextCallback() {
+                                @Override
+                                public void onText(String text) {
+                                    if (!"HAPUS".equalsIgnoreCase(text.trim())) {
+                                        Ui.toast(a, "Akun tidak dihapus");
+                                        return;
+                                    }
+                                    a.action("Menghapus akun...", new com.antarmakan.app.util.Async.Task<Boolean>() {
+                                        @Override
+                                        public Boolean run() throws Exception {
+                                            a.repo.deleteAccount();
+                                            return true;
+                                        }
+                                    }, new com.antarmakan.app.util.Async.Callback<Boolean>() {
+                                        @Override
+                                        public void onResult(Boolean r) {
+                                            com.antarmakan.app.notif.NotifCenter.stopService(a);
+                                            Ui.toast(a, "Akun Anda sudah dihapus");
+                                            Nav.login(a);
+                                        }
+                                    });
+                                }
+                            });
+                }
+            }));
+        }
         menu.addView(menuRow(a, "🚪", "Keluar", new View.OnClickListener() {
             @Override
             public void onClick(View v) {

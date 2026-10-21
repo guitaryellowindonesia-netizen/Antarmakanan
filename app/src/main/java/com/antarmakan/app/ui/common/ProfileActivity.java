@@ -1,6 +1,7 @@
 package com.antarmakan.app.ui.common;
 
 import android.os.Bundle;
+import android.widget.TextView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -16,6 +17,8 @@ import com.antarmakan.app.util.Ui;
 public class ProfileActivity extends com.antarmakan.app.ui.merchant.BaseFormActivity {
 
     private User me;
+    private boolean phoneLogin;
+    private String recoveryEmail = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,7 +29,10 @@ public class ProfileActivity extends com.antarmakan.app.ui.merchant.BaseFormActi
         load(new Async.Task<User>() {
             @Override
             public User run() throws Exception {
-                return repo.me();
+                User u = repo.me();
+                phoneLogin = repo.isPhoneLogin(u);
+                recoveryEmail = phoneLogin ? repo.recoveryEmail(u) : "";
+                return u;
             }
         }, new Async.Callback<User>() {
             @Override
@@ -39,6 +45,42 @@ public class ProfileActivity extends com.antarmakan.app.ui.merchant.BaseFormActi
 
     private void build(LinearLayout page) {
         page.removeAllViews();
+        if (phoneLogin) {
+            LinearLayout ec = formCard(page);
+            ec.addView(Ui.title(this, "🔐 Email Pemulihan"));
+            ec.addView(Ui.muted(this, "Dipakai bila Anda lupa kata sandi (link reset dikirim ke email ini)."));
+            ec.addView(Ui.text(this, recoveryEmail.length() > 0 ? "✅ " + recoveryEmail : "⚠️ Belum diatur",
+                    14, recoveryEmail.length() > 0 ? Ui.PRIMARY_DARK : Ui.RED, true));
+            TextView set = Ui.smallButton(this, recoveryEmail.length() > 0 ? "Ganti email" : "Atur email",
+                    Ui.PRIMARY, true);
+            set.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Ui.prompt(ProfileActivity.this, "Email pemulihan", "nama@gmail.com", recoveryEmail,
+                            android.text.InputType.TYPE_CLASS_TEXT
+                                    | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+                            new Ui.TextCallback() {
+                                @Override
+                                public void onText(final String email) {
+                                    action("Menyimpan...", new Async.Task<Boolean>() {
+                                        @Override
+                                        public Boolean run() throws Exception {
+                                            repo.setRecoveryEmail(email);
+                                            return true;
+                                        }
+                                    }, new Async.Callback<Boolean>() {
+                                        @Override
+                                        public void onResult(Boolean r) {
+                                            Ui.toast(ProfileActivity.this, "Email pemulihan disimpan");
+                                            recreate();
+                                        }
+                                    });
+                                }
+                            });
+                }
+            });
+            ec.addView(set);
+        }
         LinearLayout card = formCard(page);
         card.addView(Ui.label(this, "Nomor HP (tidak bisa diubah)"));
         card.addView(Ui.body(this, me.phone));

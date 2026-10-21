@@ -45,7 +45,7 @@ public class Repo {
     public static final String PROMOS = "promos";
     public static final String FAVS = "favorites";
     public static final String MSGS = "messages";
-    public static final String WALLET = "wallet";
+    public static final String WALLET = "wallet";             // wallet/{uid}/{entryId}
     public static final String TOPUPS = "topups";
     public static final String IMAGES = "images";
     public static final String NOTIFS = "notifications";       // notifications/{uid}/{id}
@@ -82,14 +82,201 @@ public class Repo {
     //  AKUN
     // =====================================================================
 
-    public User register(String name, String phone, String password, String role,
+    public static final String LOGINS = "logins";      // logins/{nomorHP} = {uid, email}
+    public static final String RECOVERY = "recovery";  // permintaan pemulihan akun
+
+    private static boolean validEmail(String e) {
+        return e != null && e.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
+    }
+
+    /**
+     * Daftar akun nomor HP. Email (opsional) dipakai untuk "Lupa kata sandi".
+     */
+    public User register(String name, String phone, String password, String email, String role,
                          String kecamatan, String address, String vehicle,
                          Restaurant restoDraft) throws Exception {
         if (password.length() < 6) throw new AppException("Kata sandi minimal 6 karakter");
         validateProfile(name, phone);
         phone = normalizePhone(phone);
-        String uid = auth.signUp(phone, password);
-        return createProfile(uid, name, phone, role, kecamatan, address, vehicle, restoDraft, "", "");
+        email = email == null ? "" : email.trim().toLowerCase(java.util.Locale.US);
+        if (email.length() > 0 && !validEmail(email)) throw new AppException("Format email tidak valid");
+        if (s.getPublic(LOGINS, phone) != null) throw new AppException("Nomor HP sudah terdaftar");
+        String loginEmail = email.length() > 0 ? email : FirebaseAuthRest.fakeEmail(phone);
+        String uid = auth.signUpEmail(loginEmail, password);
+        User u = createProfile(uid, name, phone, role, kecamatan, address, vehicle, restoDraft, "", email);
+        saveLogin(phone, uid, loginEmail);
+        return u;
+    }
+
+    private void saveLogin(String phone, String uid, String loginEmail) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("uid", uid);
+            o.put("email", loginEmail);
+            s.put(LOGINS, phone, o);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Email login untuk nomor HP (asli bila sudah diatur, jika tidak email semu). */
+    private String loginEmailOf(String phone) throws Exception {
+        JSONObject m = s.getPublic(LOGINS, phone);
+        String e = m == null ? "" : m.optString("email");
+        return e.length() > 0 ? e : FirebaseAuthRest.fakeEmail(phone);
+    }
+
+    /**
+     * Lupa kata sandi. Mengembalikan email (disamarkan) tujuan link reset,
+     * atau null bila akun belum punya email pemulihan.
+     */
+    public String forgotPassword(String phone) throws Exception {
+        phone = normalizePhone(phone);
+        JSONObject m = s.getPublic(LOGINS, phone);
+        if (m == null) throw new AppException("Nomor HP belum terdaftar / akun Google");
+        String email = m.optString("email");
+        if (FirebaseAuthRest.isFakeEmail(email)) return null;
+        auth.sendPasswordReset(email);
+        int at = email.indexOf('@');
+        return (at > 2 ? email.substring(0, 2) + "***" : "***") + email.substring(at);
+    }
+
+    /**
+     * Pemulihan lewat admin (akun tanpa email): buat login baru dengan sandi baru,
+     * admin memverifikasi lewat WhatsApp lalu memindahkan data akun lama.
+     */
+    public void requestRecovery(String phone, String name, String newPassword) throws Exception {
+        phone = normalizePhone(phone);
+        if (newPassword.length() < 6) throw new AppException("Kata sandi minimal 6 karakter");
+        JSONObject m = s.getPublic(LOGINS, phone);
+        if (m == null) throw new AppException("Nomor HP belum terdaftar");
+        String newEmail = phone + ".r" + now() + "@antarmakan.app";
+        String newUid = auth.signUpEmail(newEmail, newPassword);
+        JSONObject r = new JSONObject();
+        r.put("id", phone);
+        r.put("phone", phone);
+        r.put("name", name.trim());
+        r.put("oldUid", m.optString("uid"));
+        r.put("newUid", newUid);
+        r.put("newEmail", newEmail);
+        r.put("createdAt", now());
+        s.put(RECOVERY, phone, r);
+        Session.logout(ctx);
+    }
+
+    public List<JSONObject> recoveryRequests() throws Exception {
+        return s.list(RECOVERY);
+    }
+
+    /** Admin menyetujui pemulihan: pindahkan profil, resto & saldo ke login baru. */
+    public void approveRecovery(String phone) throws Exception {
+        JSONObject r = s.get(RECOVERY, phone);
+        if (r == null) throw new AppException("Permintaan tidak ditemukan");
+        String oldUid = r.optString("oldUid"), newUid = r.optString("newUid");
+        JSONObject old = s.get(USERS, oldUid);
+        if (old == null) throw new AppException("Akun lama tidak ditemukan");
+        long bal = old.optLong("balance");
+        JSONObject nu = new JSONObject(old.toString());
+        nu.put("id", newUid);
+        nu.put("balance", 0);
+        nu.remove("lastTx");
+        s.put(USERS, newUid, nu);
+        if (bal != 0) {
+            String tx = Ids.newId();
+            ledger(oldUid, "admin_" + tx, -bal, "Dipindah ke akun baru (pemulihan)", "");
+            ledger(newUid, "admin_" + tx, bal, "Saldo dari akun lama (pemulihan)", "");
+        }
+        Restaurant resto = restoOfOwner(oldUid);
+        if (resto != null) {
+            resto.ownerId = newUid;
+            saveResto(resto);
+        }
+        editUser(oldUid, new UserEdit() {
+            @Override
+            public void edit(JSONObject o) throws Exception {
+                o.put("active", false);
+                o.put("phone", o.optString("phone") + "-lama");
+            }
+        });
+        JSONObject login = new JSONObject();
+        login.put("uid", newUid);
+        login.put("email", r.optString("newEmail"));
+        s.put(LOGINS, phone, login);
+        s.delete(RECOVERY, phone);
+        notify(newUid, "✅ Akun dipulihkan", "Silakan masuk dengan kata sandi baru Anda.", "");
+    }
+
+    public void rejectRecovery(String phone) throws Exception {
+        s.delete(RECOVERY, phone);
+    }
+
+    /** Atur email pemulihan untuk akun nomor HP (mengganti email login). */
+    public void setRecoveryEmail(String email) throws Exception {
+        email = email.trim().toLowerCase(java.util.Locale.US);
+        if (!validEmail(email)) throw new AppException("Format email tidak valid");
+        User me = me();
+        auth.updateEmail(email);
+        saveLogin(me.phone, me.id, email);
+        final String e = email;
+        editUser(me.id, new UserEdit() {
+            @Override
+            public void edit(JSONObject o) throws Exception {
+                o.put("email", e);
+            }
+        });
+    }
+
+    /** Email pemulihan akun ini ("" bila belum ada / akun Google). */
+    public String recoveryEmail(User u) throws Exception {
+        JSONObject m = s.getPublic(LOGINS, u.phone);
+        if (m == null || !u.id.equals(m.optString("uid"))) return "";
+        String e = m.optString("email");
+        return FirebaseAuthRest.isFakeEmail(e) ? "" : e;
+    }
+
+    /** Akun ini login dengan nomor HP + sandi (bukan Google)? */
+    public boolean isPhoneLogin(User u) throws Exception {
+        JSONObject m = s.getPublic(LOGINS, u.phone);
+        return m != null && u.id.equals(m.optString("uid"));
+    }
+
+    /**
+     * Hapus akun beserta data pribadi. Riwayat transaksi tetap disimpan
+     * untuk catatan keuangan.
+     */
+    public void deleteAccount() throws Exception {
+        User u = me();
+        if (u.isAdmin()) throw new AppException("Akun admin tidak bisa dihapus dari aplikasi");
+        for (Order o : ordersOfCustomer(u.id)) {
+            if (o.isActive()) throw new AppException("Selesaikan dulu pesanan " + o.code);
+        }
+        if (u.isDriver()) {
+            for (Order o : ordersOfDriver(u.id)) {
+                if (o.isActive()) throw new AppException("Selesaikan dulu pesanan " + o.code);
+            }
+        }
+        Restaurant r = u.isMerchant() ? restoOfOwner(u.id) : null;
+        if (r != null) {
+            for (Order o : ordersOfResto(r.id)) {
+                if (o.isActive()) throw new AppException("Selesaikan dulu pesanan " + o.code);
+            }
+        }
+        if (u.balance > 0) throw new AppException("Tarik dulu saldo Anda (" + Fmt.rp(u.balance) + ")");
+        if (u.balance < 0) throw new AppException("Lunasi dulu saldo minus Anda (" + Fmt.rp(u.balance) + ")");
+
+        if (r != null) deleteResto(r.id);
+        try {
+            s.delete(FAVS, u.id);
+        } catch (Exception ignored) {
+        }
+        try {
+            s.delete(NOTIFS, u.id);
+        } catch (Exception ignored) {
+        }
+        JSONObject m = s.getPublic(LOGINS, u.phone);
+        if (m != null && u.id.equals(m.optString("uid"))) s.delete(LOGINS, u.phone);
+        s.delete(USERS, u.id);
+        if (auth != null) auth.deleteAccount();
+        Session.logout(ctx);
     }
 
     private static void validateProfile(String name, String phone) {
@@ -166,10 +353,12 @@ public class Repo {
 
     public User login(String phone, String password) throws Exception {
         phone = normalizePhone(phone);
-        String uid = auth.signIn(phone, password);
+        boolean mapped = s.getPublic(LOGINS, phone) != null;
+        String uid = auth.signInEmail(loginEmailOf(phone), password);
         JSONObject o = s.get(USERS, uid);
         if (o == null) throw new AppException("Data akun tidak ditemukan");
         User u = User.fromJson(o);
+        if (!mapped) saveLogin(phone, uid, FirebaseAuthRest.fakeEmail(phone)); // akun lama
         if (!u.active && !u.isDriver()) throw new AppException("Akun Anda dinonaktifkan admin");
         Session.login(ctx, u.id, u.role);
         return u;
@@ -271,32 +460,50 @@ public class Repo {
     //  SALDO / DOMPET
     // =====================================================================
 
-    /** Tambah (amount > 0) atau kurangi (amount < 0) saldo + catat riwayat. */
-    public long adjustBalance(String uid, final long amount, String desc,
-                              final boolean allowNegative) throws Exception {
-        JSONObject o = editUser(uid, new UserEdit() {
-            @Override
-            public void edit(JSONObject o) throws Exception {
-                long bal = o.optLong("balance") + amount;
-                if (bal < 0 && amount < 0 && !allowNegative) {
-                    throw new AppException("Saldo tidak cukup");
-                }
-                o.put("balance", bal);
+    /**
+     * Catat mutasi saldo. Saldo & riwayat ditulis sekaligus (atomic) dan diperiksa
+     * oleh Rules Firebase, sehingga saldo tidak bisa diubah sembarangan dari HP.
+     * entryId dibuat pasti (mis. "refund_ORDERID") agar tidak bisa tercatat dua kali.
+     */
+    private long ledger(String uid, String entryId, long amount, String desc, String orderId)
+            throws Exception {
+        if (uid == null || uid.length() == 0 || amount == 0) return 0;
+        PermissionDeniedException last = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            JSONObject u = s.get(USERS, uid);
+            if (u == null) throw new AppException("Akun tidak ditemukan");
+            long nb = u.optLong("balance") + amount;
+            JSONObject e = new JSONObject();
+            e.put("id", entryId);
+            e.put("userId", uid);
+            e.put("amount", amount);
+            e.put("description", desc);
+            e.put("orderId", orderId == null ? "" : orderId);
+            e.put("createdAt", now());
+            Map<String, Object> m = new HashMap<String, Object>();
+            m.put(WALLET + "/" + uid + "/" + entryId, e);
+            m.put(USERS + "/" + uid + "/balance", nb);
+            m.put(USERS + "/" + uid + "/lastTx", entryId);
+            try {
+                s.update(m);
+                return nb;
+            } catch (PermissionDeniedException pe) {
+                last = pe;
+                if (s.get(WALLET + "/" + uid, entryId) != null) return nb; // sudah tercatat
+                Thread.sleep(300L * (attempt + 1));  // mungkin bentrok dengan mutasi lain
             }
-        });
-        WalletTx t = new WalletTx();
-        t.id = Ids.newId();
-        t.userId = uid;
-        t.amount = amount;
-        t.description = desc;
-        t.createdAt = now();
-        s.put(WALLET, t.id, t.toJson());
-        return o.optLong("balance");
+        }
+        throw amount < 0 ? new AppException("Saldo tidak cukup") : last;
+    }
+
+    /** Koreksi saldo manual oleh admin. */
+    public long adjustBalance(String uid, long amount, String desc, boolean ignored) throws Exception {
+        return ledger(uid, "admin_" + Ids.newId(), amount, desc, "");
     }
 
     public List<WalletTx> walletHistory(String uid) throws Exception {
         List<WalletTx> out = new ArrayList<WalletTx>();
-        for (JSONObject o : s.query(WALLET, "userId", uid)) out.add(WalletTx.fromJson(o));
+        for (JSONObject o : s.list(WALLET + "/" + uid)) out.add(WalletTx.fromJson(o));
         Collections.sort(out, new Comparator<WalletTx>() {
             @Override
             public int compare(WalletTx a, WalletTx b) {
@@ -337,7 +544,8 @@ public class Repo {
         t.amount = amount;
         t.info = info;
         t.createdAt = now();
-        adjustBalance(u.id, -amount, "Penarikan saldo (diproses)", false);
+        if (u.balance < amount) throw new AppException("Saldo tidak cukup");
+        ledger(u.id, "wd_" + t.id, -amount, "Penarikan saldo (diproses)", "");
         s.put(TOPUPS, t.id, t.toJson());
     }
 
@@ -368,9 +576,9 @@ public class Repo {
         TopUp t = TopUp.fromJson(o);
         boolean top = TopUp.TYPE_TOPUP.equals(t.type);
         if (top) {
-            if (approve) adjustBalance(t.userId, t.amount, "Top up saldo", true);
+            if (approve) ledger(t.userId, "topup_" + t.id, t.amount, "Top up saldo", "");
         } else if (!approve) {
-            adjustBalance(t.userId, t.amount, "Penarikan ditolak, saldo dikembalikan", true);
+            ledger(t.userId, "wdrefund_" + t.id, t.amount, "Penarikan ditolak, saldo dikembalikan", "");
         }
         notify(t.userId, (top ? "Top up " : "Penarikan ") + (approve ? "disetujui ✅" : "ditolak ❌"),
                 Fmt.rp(t.amount), "");
@@ -599,6 +807,9 @@ public class Repo {
         if (p.code.length() < 3) throw new AppException("Kode promo minimal 3 huruf");
         if (p.value <= 0) throw new AppException("Nilai promo harus lebih dari 0");
         if (Promo.TYPE_PERSEN.equals(p.type) && p.value > 100) throw new AppException("Persen maksimal 100");
+        if (Promo.TYPE_PERSEN.equals(p.type) && p.maxDiscount <= 0) {
+            throw new AppException("Isi maksimal potongan (Rp) untuk promo persen");
+        }
         Promo existing = findPromo(p.code);
         if (existing != null && !existing.id.equals(p.id)) throw new AppException("Kode promo sudah ada");
         if (p.id.length() == 0) p.id = Ids.newId();
@@ -704,6 +915,7 @@ public class Repo {
         o.distanceKm = q.distanceKm;
         o.paymentMethod = payment;
         o.promoCode = q.promo == null ? "" : q.promo.code;
+        o.promoId = q.promo == null ? "" : q.promo.id;
         o.address = address.trim();
         o.kecamatan = kecamatan;
         o.note = note == null ? "" : note.trim();
@@ -724,16 +936,27 @@ public class Repo {
             });
         }
 
-        if (Order.BAYAR_SALDO.equals(payment)) {
-            adjustBalance(u.id, -o.total, "Bayar pesanan " + o.code, false);
+        if (Order.BAYAR_SALDO.equals(payment) && u.balance < o.total) {
+            throw new AppException("Saldo tidak cukup");
         }
-        try {
-            s.put(ORDERS, o.id, o.toJson());
-        } catch (Exception e) {
-            if (Order.BAYAR_SALDO.equals(payment)) {
-                adjustBalance(u.id, o.total, "Pengembalian " + o.code, true);
+        s.put(ORDERS, o.id, o.toJson());
+        if (Order.BAYAR_SALDO.equals(payment)) {
+            try {
+                ledger(u.id, "pay_" + o.id, -o.total, "Bayar pesanan " + o.code, o.id);
+            } catch (Exception e) {
+                // pembayaran gagal: batalkan pesanan (tanpa pengembalian karena belum terbayar)
+                try {
+                    transition(o.id, new Transition() {
+                        @Override
+                        public void apply(Order x) {
+                            x.status = Order.DIBATALKAN;
+                            x.cancelReason = "Pembayaran saldo gagal";
+                        }
+                    });
+                } catch (Exception ignored) {
+                }
+                throw e;
             }
-            throw e;
         }
         cart.clear();
         notify(o.restoOwnerId, "🔔 Pesanan baru " + o.code,
@@ -744,7 +967,53 @@ public class Repo {
     public Order order(String id) throws Exception {
         JSONObject o = s.get(ORDERS, id);
         if (o == null) throw new AppException("Pesanan tidak ditemukan");
-        return Order.fromJson(o);
+        List<Order> one = new ArrayList<Order>();
+        one.add(Order.fromJson(o));
+        expireStale(one);
+        return one.get(0);
+    }
+
+    /** Pesanan menunggu resto terlalu lama? */
+    public static boolean isStale(Order o) {
+        return o.status == Order.MENUNGGU
+                && System.currentTimeMillis() - o.createdAt > Config.BATAS_RESPON_RESTO_MENIT * 60000L;
+    }
+
+    /** Pelanggan boleh membatalkan karena tidak ada driver? */
+    public static boolean canCancelNoDriver(Order o) {
+        return (o.status == Order.DIMASAK || o.status == Order.SIAP) && !o.hasDriver() && !o.selfDelivery
+                && System.currentTimeMillis() - o.updatedAt > Config.BATAS_CARI_DRIVER_MENIT * 60000L;
+    }
+
+    /**
+     * Batalkan otomatis pesanan yang tidak direspons resto. Dijalankan oleh HP
+     * pelanggan / resto saat memuat pesanan (tidak perlu server).
+     */
+    private void expireStale(List<Order> list) {
+        String me = Session.userId(ctx);
+        for (int i = 0; i < list.size(); i++) {
+            final Order o = list.get(i);
+            if (!isStale(o)) continue;
+            if (!me.equals(o.customerId) && !me.equals(o.restoOwnerId)) continue;
+            try {
+                Order c = transition(o.id, new Transition() {
+                    @Override
+                    public void apply(Order x) {
+                        if (x.status != Order.MENUNGGU) throw new AppException("sudah diproses");
+                        x.status = Order.DIBATALKAN;
+                        x.cancelReason = "Otomatis dibatalkan: resto tidak merespons "
+                                + Config.BATAS_RESPON_RESTO_MENIT + " menit";
+                    }
+                });
+                afterCancel(c);
+                notify(c.customerId, "❌ Pesanan " + c.code + " dibatalkan",
+                        "Resto tidak merespons. Dana dikembalikan bila bayar saldo.", c.id);
+                notify(c.restoOwnerId, "Pesanan " + c.code + " dibatalkan otomatis",
+                        "Tidak direspons dalam " + Config.BATAS_RESPON_RESTO_MENIT + " menit", c.id);
+                list.set(i, c);
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private static List<Order> toOrders(List<JSONObject> raw) {
@@ -761,11 +1030,15 @@ public class Repo {
     }
 
     public List<Order> ordersOfCustomer(String uid) throws Exception {
-        return toOrders(s.query(ORDERS, "customerId", uid));
+        List<Order> l = toOrders(s.query(ORDERS, "customerId", uid));
+        expireStale(l);
+        return l;
     }
 
     public List<Order> ordersOfResto(String restoId) throws Exception {
-        return toOrders(s.query(ORDERS, "restoId", restoId));
+        List<Order> l = toOrders(s.query(ORDERS, "restoId", restoId));
+        expireStale(l);
+        return l;
     }
 
     public List<Order> ordersOfDriver(String driverId) throws Exception {
@@ -796,11 +1069,14 @@ public class Repo {
                 if (cur == null) throw new AppException("Pesanan tidak ditemukan");
                 Order o = Order.fromJson(cur);
                 t.apply(o);
-                o.updatedAt = now();
-                return o.toJson();
+                JSONObject j = o.toJson();
+                j.put("updatedAt", serverTime()); // waktu server (dipakai Rules)
+                return j;
             }
         });
-        return Order.fromJson(res);
+        Order out = Order.fromJson(res);
+        out.updatedAt = now();
+        return out;
     }
 
     // ---- aksi resto ----
@@ -897,6 +1173,21 @@ public class Repo {
         return o;
     }
 
+    /** Batal karena tidak ada driver dalam batas waktu. */
+    public Order customerCancelNoDriver(String orderId) throws Exception {
+        Order o = transition(orderId, new Transition() {
+            @Override
+            public void apply(Order o) {
+                if (!canCancelNoDriver(o)) throw new AppException("Pesanan tidak bisa dibatalkan sekarang");
+                o.status = Order.DIBATALKAN;
+                o.cancelReason = "Dibatalkan pelanggan: tidak ada driver";
+            }
+        });
+        afterCancel(o);
+        notify(o.restoOwnerId, "Pesanan " + o.code + " dibatalkan", "Tidak ada driver yang mengambil", o.id);
+        return o;
+    }
+
     // ---- aksi admin ----
 
     public Order adminCancel(String orderId, final String reason) throws Exception {
@@ -926,8 +1217,9 @@ public class Repo {
 
     private void afterCancel(Order o) throws Exception {
         clearTracking(o.id);
-        if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
-            adjustBalance(o.customerId, o.total, "Pengembalian dana " + o.code, true);
+        if (Order.BAYAR_SALDO.equals(o.paymentMethod)
+                && s.get(WALLET + "/" + o.customerId, "pay_" + o.id) != null) {
+            ledger(o.customerId, "refund_" + o.id, o.total, "Pengembalian dana " + o.code, o.id);
         }
         if (o.promoCode.length() > 0) {
             Promo p = findPromo(o.promoCode);
@@ -1015,26 +1307,22 @@ public class Repo {
             // diantar sendiri: ongkir 100% untuk penjual
             if (o.restoOwnerId.length() == 0) return;
             if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
-                adjustBalance(o.restoOwnerId, o.subtotal - komisiResto + o.deliveryFee,
-                        "Penjualan + ongkir " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", true);
+                ledger(o.restoOwnerId, "settle_" + o.id, o.subtotal - komisiResto + o.deliveryFee,
+                        "Penjualan + ongkir " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", o.id);
             } else {
-                adjustBalance(o.restoOwnerId, o.discount - komisiResto - o.serviceFee,
-                        "Komisi & biaya layanan " + o.code + " (tunai)", true);
+                ledger(o.restoOwnerId, "settle_" + o.id, o.discount - komisiResto - o.serviceFee,
+                        "Komisi & biaya layanan " + o.code + " (tunai)", o.id);
             }
             return;
         }
         if (Order.BAYAR_SALDO.equals(o.paymentMethod)) {
-            if (o.restoOwnerId.length() > 0) {
-                adjustBalance(o.restoOwnerId, o.subtotal - komisiResto,
-                        "Penjualan " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", true);
-            }
-            adjustBalance(o.driverId, o.deliveryFee - komisiDriver, "Ongkir " + o.code, true);
+            ledger(o.restoOwnerId, "settle_" + o.id, o.subtotal - komisiResto,
+                    "Penjualan " + o.code + " (potong komisi " + Config.KOMISI_PERSEN_RESTO + "%)", o.id);
+            ledger(o.driverId, "fee_" + o.id, o.deliveryFee - komisiDriver, "Ongkir " + o.code, o.id);
         } else {
-            if (o.restoOwnerId.length() > 0) {
-                adjustBalance(o.restoOwnerId, -komisiResto, "Komisi aplikasi " + o.code, true);
-            }
+            ledger(o.restoOwnerId, "settle_" + o.id, -komisiResto, "Komisi aplikasi " + o.code, o.id);
             long driverAdj = o.discount - komisiDriver - o.serviceFee;
-            adjustBalance(o.driverId, driverAdj, "Komisi & biaya layanan " + o.code + " (tunai)", true);
+            ledger(o.driverId, "fee_" + o.id, driverAdj, "Komisi & biaya layanan " + o.code + " (tunai)", o.id);
         }
     }
 

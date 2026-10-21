@@ -1,16 +1,247 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
-    "users":       { ".indexOn": ["phone", "role"] },
-    "restaurants": { ".indexOn": ["ownerId"] },
-    "menus":       { ".indexOn": ["restoId"] },
-    "orders":      { ".indexOn": ["customerId", "restoId", "driverId", "status"] },
-    "reviews":     { ".indexOn": ["restoId", "driverId"] },
-    "messages":    { ".indexOn": ["orderId"] },
-    "wallet":      { ".indexOn": ["userId"] },
-    "topups":      { ".indexOn": ["userId", "status"] },
-    "notifications": { "$uid": { ".indexOn": ["createdAt"] } },
-    "broadcasts":  { ".indexOn": ["createdAt"] }
+    "users": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "phone",
+        "role"
+      ],
+      "$uid": {
+        ".write": "auth != null && (newData.exists() || auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        "role": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && auth.uid === $uid && (newData.val() === 'customer' || newData.val() === 'merchant' || newData.val() === 'driver' || (newData.val() === 'admin' && auth.token.email === '082286504869@antarmakan.app')))"
+        },
+        "active": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && auth.uid === $uid && newData.val() === (newData.parent().child('role').val() !== 'driver'))"
+        },
+        "balance": {
+          ".validate": "(!data.exists() && newData.val() === 0 && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')) || newData.val() === data.val() || (newData.parent().child('lastTx').val() !== data.parent().child('lastTx').val() && !root.child('wallet').child($uid).child(newData.parent().child('lastTx').val()).exists() && newData.val() === data.val() + newData.parent().parent().parent().child('wallet').child($uid).child(newData.parent().child('lastTx').val()).child('amount').val())"
+        },
+        "lastTx": {
+          ".validate": "newData.val() === data.val() || newData.parent().parent().parent().child('wallet').child($uid).child(newData.val()).exists()"
+        },
+        "$other": {
+          ".validate": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val()"
+        },
+        "ratingSum": {
+          ".validate": "newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.val() === 0) || (newData.val() - data.val() >= 1 && newData.val() - data.val() <= 5 && newData.parent().child('ratingCount').val() === data.parent().child('ratingCount').val() + 1)"
+        },
+        "ratingCount": {
+          ".validate": "newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.val() === 0) || newData.val() === data.val() + 1"
+        }
+      }
+    },
+    "restaurants": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "ownerId"
+      ],
+      "$rid": {
+        ".write": "auth != null && (newData.exists() || root.child('users').child(auth.uid).child('role').val() === 'admin' || data.child('ownerId').val() === auth.uid)",
+        "ownerId": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && newData.val() === auth.uid)"
+        },
+        "active": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && newData.val() === false)"
+        },
+        "$other": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || newData.parent().child('ownerId').val() === auth.uid"
+        },
+        "ratingSum": {
+          ".validate": "newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.val() === 0) || (newData.val() - data.val() >= 1 && newData.val() - data.val() <= 5 && newData.parent().child('ratingCount').val() === data.parent().child('ratingCount').val() + 1)"
+        },
+        "ratingCount": {
+          ".validate": "newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.val() === 0) || newData.val() === data.val() + 1"
+        }
+      }
+    },
+    "menus": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "restoId"
+      ],
+      "$mid": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || ((!data.exists() || root.child('restaurants').child(data.child('restoId').val()).child('ownerId').val() === auth.uid) && (!newData.exists() || root.child('restaurants').child(newData.child('restoId').val()).child('ownerId').val() === auth.uid)))"
+      }
+    },
+    "orders": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "customerId",
+        "restoId",
+        "driverId",
+        "status"
+      ],
+      "$oid": {
+        ".write": "auth != null && newData.exists()",
+        ".validate": "data.exists() || (newData.child('customerId').val() === auth.uid && newData.child('status').val() === 0 && newData.child('driverId').val() === '' && newData.child('restoOwnerId').val() === root.child('restaurants').child(newData.child('restoId').val()).child('ownerId').val() && newData.child('total').val() === newData.child('subtotal').val() + newData.child('deliveryFee').val() + newData.child('serviceFee').val() - newData.child('discount').val() && newData.child('discount').val() >= 0 && newData.child('total').val() >= 0 && newData.child('deliveryFee').val() >= 0 && newData.child('serviceFee').val() >= 0 && newData.child('subtotal').val() > 0 && (newData.child('discount').val() === 0 || (root.child('promos').child(newData.child('promoId').val()).child('active').val() === true && newData.child('discount').val() <= (root.child('promos').child(newData.child('promoId').val()).child('type').val() === 'PERSEN' ? root.child('promos').child(newData.child('promoId').val()).child('maxDiscount').val() : root.child('promos').child(newData.child('promoId').val()).child('value').val()))))",
+        "customerId": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "restoId": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "restoOwnerId": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "subtotal": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "deliveryFee": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "serviceFee": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "discount": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "total": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "paymentMethod": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "selfDelivery": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "promoId": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "createdAt": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "code": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "status": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || (data.val() === 0 && newData.val() === 1 && data.parent().child('restoOwnerId').val() === auth.uid && (data.parent().child('paymentMethod').val() !== 'SALDO' || root.child('wallet').child(data.parent().child('customerId').val()).child('pay_' + $oid).exists())) || (data.val() === 0 && newData.val() === 9 && (data.parent().child('customerId').val() === auth.uid || data.parent().child('restoOwnerId').val() === auth.uid)) || (data.val() === 1 && (newData.val() === 2 || newData.val() === 3) && data.parent().child('restoOwnerId').val() === auth.uid) || ((data.val() === 1 || data.val() === 2) && newData.val() === 9 && data.parent().child('customerId').val() === auth.uid && data.parent().child('driverId').val() === '' && data.parent().child('selfDelivery').val() !== true && now - data.parent().child('updatedAt').val() > 1200000) || (data.val() === 2 && newData.val() === 3 && newData.parent().child('driverId').val() === auth.uid) || (data.val() === 3 && newData.val() === 4 && data.parent().child('driverId').val() === auth.uid) || ((data.val() === 1 || data.val() === 2) && newData.val() === 4 && data.parent().child('selfDelivery').val() === true && data.parent().child('restoOwnerId').val() === auth.uid) || (data.val() === 4 && newData.val() === 5 && ((data.parent().child('selfDelivery').val() === true && data.parent().child('restoOwnerId').val() === auth.uid) || (data.parent().child('selfDelivery').val() !== true && data.parent().child('driverId').val() === auth.uid)))"
+        },
+        "driverId": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || (data.val() === '' && newData.val() === auth.uid && root.child('users').child(auth.uid).child('role').val() === 'driver' && root.child('users').child(auth.uid).child('active').val() === true && data.parent().child('selfDelivery').val() !== true)"
+        },
+        "rated": {
+          ".validate": "!data.exists() || newData.val() === data.val() || (data.parent().child('customerId').val() === auth.uid && data.parent().child('status').val() === 5)"
+        },
+        "updatedAt": {
+          ".validate": "!data.exists() || newData.val() === data.val() || (newData.val() <= now && newData.val() > now - 10000)"
+        }
+      }
+    },
+    "wallet": {
+      "$uid": {
+        ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
+        "$entry": {
+          ".read": "auth != null",
+          ".write": "auth != null && !data.exists() && newData.exists() && newData.parent().parent().parent().child('users').child($uid).child('lastTx').val() === $entry",
+          ".validate": "newData.child('amount').isNumber() && ((auth.uid === $uid && newData.child('amount').val() < 0 && ($entry.beginsWith('pay_') || $entry.beginsWith('wd_')) && newData.parent().parent().parent().child('users').child($uid).child('balance').val() >= 0) || ($entry.beginsWith('refund_') && root.child('orders').child($entry.replace('refund_', '')).child('status').val() === 9 && root.child('orders').child($entry.replace('refund_', '')).child('customerId').val() === $uid && root.child('orders').child($entry.replace('refund_', '')).child('paymentMethod').val() === 'SALDO' && newData.child('amount').val() === root.child('orders').child($entry.replace('refund_', '')).child('total').val() && root.child('wallet').child($uid).child('pay_' + $entry.replace('refund_', '')).exists()) || ($entry.beginsWith('settle_') && root.child('orders').child($entry.replace('settle_', '')).child('status').val() === 5 && root.child('orders').child($entry.replace('settle_', '')).child('restoOwnerId').val() === $uid && newData.child('amount').val() <= (root.child('orders').child($entry.replace('settle_', '')).child('paymentMethod').val() === 'SALDO' ? root.child('orders').child($entry.replace('settle_', '')).child('subtotal').val() + (root.child('orders').child($entry.replace('settle_', '')).child('selfDelivery').val() === true ? root.child('orders').child($entry.replace('settle_', '')).child('deliveryFee').val() : 0) : (root.child('orders').child($entry.replace('settle_', '')).child('selfDelivery').val() === true ? root.child('orders').child($entry.replace('settle_', '')).child('discount').val() : 0)) && newData.child('amount').val() >= 0 - (root.child('orders').child($entry.replace('settle_', '')).child('subtotal').val() + root.child('orders').child($entry.replace('settle_', '')).child('deliveryFee').val() + root.child('orders').child($entry.replace('settle_', '')).child('serviceFee').val()) && (root.child('orders').child($entry.replace('settle_', '')).child('paymentMethod').val() !== 'SALDO' || root.child('wallet').child(root.child('orders').child($entry.replace('settle_', '')).child('customerId').val()).child('pay_' + $entry.replace('settle_', '')).exists())) || ($entry.beginsWith('fee_') && root.child('orders').child($entry.replace('fee_', '')).child('status').val() === 5 && root.child('orders').child($entry.replace('fee_', '')).child('driverId').val() === $uid && root.child('orders').child($entry.replace('fee_', '')).child('selfDelivery').val() !== true && newData.child('amount').val() <= (root.child('orders').child($entry.replace('fee_', '')).child('paymentMethod').val() === 'SALDO' ? root.child('orders').child($entry.replace('fee_', '')).child('deliveryFee').val() : root.child('orders').child($entry.replace('fee_', '')).child('discount').val()) && newData.child('amount').val() >= 0 - (root.child('orders').child($entry.replace('fee_', '')).child('deliveryFee').val() + root.child('orders').child($entry.replace('fee_', '')).child('serviceFee').val()) && (root.child('orders').child($entry.replace('fee_', '')).child('paymentMethod').val() !== 'SALDO' || root.child('wallet').child(root.child('orders').child($entry.replace('fee_', '')).child('customerId').val()).child('pay_' + $entry.replace('fee_', '')).exists())) || (root.child('users').child(auth.uid).child('role').val() === 'admin' && ($entry.beginsWith('topup_') || $entry.beginsWith('wdrefund_') || $entry.beginsWith('admin_'))))"
+        }
+      }
+    },
+    "promos": {
+      ".read": "auth != null",
+      "$pid": {
+        ".write": "auth != null && (newData.exists() || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        "quota": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || newData.val() === data.val() - 1 || newData.val() === data.val() + 1"
+        },
+        "$other": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val()"
+        }
+      }
+    },
+    "reviews": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "restoId",
+        "driverId"
+      ],
+      "$rv": {
+        ".write": "auth != null && (newData.exists() || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        "reply": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && newData.val() === '') || root.child('restaurants').child(newData.parent().child('restoId').val()).child('ownerId').val() === auth.uid"
+        },
+        "$other": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.parent().exists() && newData.parent().child('customerId').val() === auth.uid && root.child('orders').child(newData.parent().child('orderId').val()).child('customerId').val() === auth.uid)"
+        }
+      }
+    },
+    "messages": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "orderId"
+      ],
+      "$m": {
+        ".write": "auth != null && !data.exists() && newData.child('senderId').val() === auth.uid"
+      }
+    },
+    "topups": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "userId",
+        "status"
+      ],
+      "$t": {
+        ".write": "auth != null && (newData.exists() || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        "status": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && newData.val() === 0)"
+        },
+        "userId": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || (!data.exists() && newData.val() === auth.uid)"
+        },
+        "$other": {
+          ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || newData.val() === data.val() || !data.parent().exists()"
+        }
+      }
+    },
+    "favorites": {
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid"
+      }
+    },
+    "images": {
+      ".read": "auth != null",
+      "$i": {
+        ".write": "auth != null"
+      }
+    },
+    "tracking": {
+      ".read": "auth != null",
+      "$oid": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('orders').child($oid).child('driverId').val() === auth.uid || (root.child('orders').child($oid).child('selfDelivery').val() === true && root.child('orders').child($oid).child('restoOwnerId').val() === auth.uid))"
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid && !newData.exists()",
+        ".indexOn": [
+          "createdAt"
+        ],
+        "$nid": {
+          ".write": "auth != null && !data.exists()"
+        }
+      }
+    },
+    "broadcasts": {
+      ".read": "auth != null",
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".indexOn": [
+        "createdAt"
+      ]
+    },
+    "logins": {
+      "$phone": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid)"
+      }
+    },
+    "recovery": {
+      ".read": "root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$phone": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || (newData.exists() && newData.child('newUid').val() === auth.uid && (!data.exists() || data.child('newUid').val() === auth.uid)))"
+      }
+    }
   }
 }

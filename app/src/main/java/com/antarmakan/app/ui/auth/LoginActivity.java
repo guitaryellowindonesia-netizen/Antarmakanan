@@ -65,6 +65,16 @@ public class LoginActivity extends BaseActivity {
             }
         });
         card.addView(reg);
+        TextView forgot = Ui.text(this, "Lupa kata sandi?", 14, Ui.PRIMARY, true);
+        forgot.setGravity(Gravity.CENTER);
+        forgot.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 4));
+        forgot.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                forgotPassword();
+            }
+        });
+        card.addView(forgot, Ui.matchWrap());
 
         if (Config.googleLoginEnabled()) {
             TextView or = Ui.muted(this, "atau");
@@ -113,6 +123,86 @@ public class LoginActivity extends BaseActivity {
                 Ui.toast(LoginActivity.this, message);
             }
         });
+    }
+
+    private void forgotPassword() {
+        Ui.prompt(this, "Lupa kata sandi", "Nomor HP akun Anda", phone.getText().toString(),
+                android.text.InputType.TYPE_CLASS_PHONE, new Ui.TextCallback() {
+                    @Override
+                    public void onText(final String ph) {
+                        if (ph.length() < 9) return;
+                        action("Memeriksa...", new Async.Task<String>() {
+                            @Override
+                            public String run() throws Exception {
+                                String masked = repo.forgotPassword(ph);
+                                return masked == null ? "" : masked;
+                            }
+                        }, new Async.Callback<String>() {
+                            @Override
+                            public void onResult(String masked) {
+                                if (masked.length() > 0) {
+                                    new android.app.AlertDialog.Builder(LoginActivity.this)
+                                            .setTitle("Cek email Anda")
+                                            .setMessage("Link untuk membuat kata sandi baru sudah dikirim ke "
+                                                    + masked + ". Buka emailnya, buat sandi baru, lalu masuk lagi.")
+                                            .setPositiveButton("OK", null).show();
+                                } else {
+                                    recoveryDialog(ph);
+                                }
+                            }
+                        });
+                    }
+                });
+    }
+
+    /** Akun tanpa email: ajukan pemulihan ke admin. */
+    private void recoveryDialog(final String ph) {
+        LinearLayout box = Ui.vbox(this);
+        box.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
+        box.addView(Ui.body(this, "Akun ini belum punya email pemulihan. Ajukan pemulihan ke admin: "
+                + "buat kata sandi baru, lalu admin akan memverifikasi Anda lewat WhatsApp."));
+        box.addView(Ui.label(this, "Nama sesuai akun"));
+        final EditText nm = Ui.edit(this, "Nama Anda");
+        box.addView(nm);
+        box.addView(Ui.label(this, "Kata sandi baru"));
+        final EditText pw = Ui.password(this, "Minimal 6 karakter");
+        box.addView(pw);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Pulihkan akun")
+                .setView(box)
+                .setPositiveButton("Ajukan", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        final String n = nm.getText().toString();
+                        final String p = pw.getText().toString();
+                        action("Mengirim...", new Async.Task<Boolean>() {
+                            @Override
+                            public Boolean run() throws Exception {
+                                repo.requestRecovery(ph, n, p);
+                                return true;
+                            }
+                        }, new Async.Callback<Boolean>() {
+                            @Override
+                            public void onResult(Boolean r) {
+                                new android.app.AlertDialog.Builder(LoginActivity.this)
+                                        .setTitle("Permintaan terkirim")
+                                        .setMessage("Hubungi admin lewat WhatsApp untuk verifikasi. Setelah "
+                                                + "disetujui, masuk dengan nomor HP & kata sandi baru.")
+                                        .setPositiveButton("Chat Admin", new android.content.DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(android.content.DialogInterface d, int w) {
+                                                Ui.whatsapp(LoginActivity.this, Config.CS_PHONE,
+                                                        "Halo admin, saya " + n + " (" + ph
+                                                                + ") mengajukan pemulihan akun AntarMakan.");
+                                            }
+                                        })
+                                        .setNegativeButton("Tutup", null).show();
+                            }
+                        });
+                    }
+                })
+                .setNegativeButton("Batal", null)
+                .show();
     }
 
     private void doLogin() {

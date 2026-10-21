@@ -32,6 +32,7 @@ public class Order {
     public long total;
     public String paymentMethod = BAYAR_TUNAI;
     public String promoCode = "";
+    public String promoId = "";
     public String address = "";
     public String kecamatan = "";
     public String note = "";
@@ -115,6 +116,7 @@ public class Order {
         o.put("total", total);
         o.put("paymentMethod", paymentMethod);
         o.put("promoCode", promoCode);
+        o.put("promoId", promoId);
         o.put("address", address);
         o.put("kecamatan", kecamatan);
         o.put("note", note);
@@ -161,6 +163,7 @@ public class Order {
         r.total = o.optLong("total");
         r.paymentMethod = o.optString("paymentMethod", BAYAR_TUNAI);
         r.promoCode = o.optString("promoCode");
+        r.promoId = o.optString("promoId");
         r.address = o.optString("address");
         r.kecamatan = o.optString("kecamatan");
         r.note = o.optString("note");

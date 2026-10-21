@@ -22,7 +22,7 @@ import java.util.Arrays;
 public class RegisterActivity extends BaseActivity {
 
     private RadioGroup roleGroup;
-    private EditText name, phone, pass, address, vehicle, restoName, restoAddress;
+    private EditText name, phone, pass, emailIn, address, vehicle, restoName, restoAddress;
     private Spinner kec, restoCat;
     private LinearLayout driverBox, merchantBox;
     private String googleUid, googleEmail;
@@ -59,9 +59,13 @@ public class RegisterActivity extends BaseActivity {
         phone = Ui.phone(this, "08xxxxxxxxxx");
         card.addView(phone);
         pass = Ui.password(this, "Minimal 6 karakter");
+        emailIn = Ui.edit(this, "nama@gmail.com", android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         if (!google) {
             card.addView(Ui.label(this, "Kata sandi"));
             card.addView(pass);
+            card.addView(Ui.label(this, "Email (disarankan, untuk lupa kata sandi)"));
+            card.addView(emailIn);
         }
         card.addView(Ui.label(this, "Kecamatan"));
         kec = Ui.spinner(this, Config.namaKecamatan(), 0);
@@ -135,6 +139,7 @@ public class RegisterActivity extends BaseActivity {
         final String n = name.getText().toString();
         final String ph = phone.getText().toString();
         final String pw = pass.getText().toString();
+        final String em = emailIn.getText().toString().trim();
         final String k = (String) kec.getSelectedItem();
         final String addr = address.getText().toString().trim();
         final String veh = vehicle.getText().toString().trim();
@@ -166,7 +171,7 @@ public class RegisterActivity extends BaseActivity {
                 if (googleUid != null) {
                     return repo.completeGoogleProfile(googleUid, googleEmail, n, ph, role, k, addr, veh, fd);
                 }
-                return repo.register(n, ph, pw, role, k, addr, veh, fd);
+                return repo.register(n, ph, pw, em, role, k, addr, veh, fd);
             }
         }, new Async.Callback<User>() {
             @Override
